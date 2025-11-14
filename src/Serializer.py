@@ -347,11 +347,12 @@ class LVCluster(LVType):
         for field in self._value:
             # Alinear si necesario
             aligned_offset = context.align_offset(offset)
-            if aligned_offset != offset:
+            """if aligned_offset != offset:
                 buffer.write(b'\x00' * (aligned_offset - offset))
-                offset = aligned_offset
+                offset = aligned_offset"""
 
             field_data = field.serialize(context)
+            #print(f"{field}#{field_data.hex()}")
             buffer.write(field_data)
             offset += len(field_data)
 
@@ -454,7 +455,7 @@ class LVObject(LVType):
 
     def _extract_metadata(self) -> LVObjectMetadata:
         """Extrae metadatos automáticamente desde la clase Python"""
-        class_name = self.__class__.__name__
+        class_name = self.__class__.__name__.replace("_", " ") + ".lvclass"
 
         # Obtener clase padre si existe
         parent_meta = None
@@ -466,7 +467,7 @@ class LVObject(LVType):
 
         # Buscar atributos de versión
         version = getattr(self.__class__, '__lv_version__', (1, 0, 0, 0))
-        library = getattr(self.__class__, '__lv_library__', "")
+        library = getattr(self.__class__, '__lv_library__', "") + ".lvlib"
 
         return LVObjectMetadata(
             library=library,
@@ -685,11 +686,7 @@ def lvflatten(data: Any, context: Optional[SerializationContext] = None) -> byte
         bytes: Datos serializados en formato LabVIEW
     
     Examples:
-        >>> lvflatten(42)
-        >>> lvflatten("Hello World")
-        >>> lvflatten([1, 2, 3])
-        >>> lvflatten(("Hello", 1, 0.15, ["a", "b"], [1, 2]))
-        >>> lvflatten({"x": 10, "y": 20, "label": "Point"})
+
     """
     context = context or SerializationContext()
     lv_type = _auto_infer_type(data)
