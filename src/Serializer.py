@@ -252,21 +252,28 @@ class LVString(LVType):
 class LVArray(LVType):
     """
     Array de LabVIEW: dimensiones + datos
-    Formato: int32 (num_dims) + int32[] (dims) + elementos
+    Formato 1D: [num_elements (I32)] + [elements...]
+    Formato 2D+: [num_dims (I32)] [dim1_size] [dim2_size] ... + [elements...]
     """
 
-    def __init__(self, elements: List[LVType], element_type: type):
+    def __init__(self, elements: List[LVType], element_type: type, dimensions: Optional[Tuple[int, ...]] = None):
         self.element_type = element_type
+        self.dimensions = dimensions if dimensions else (len(elements),)
         super().__init__(elements)
 
     def serialize(self, context: SerializationContext) -> bytes:
         buffer = BytesIO()
 
-        # Número de dimensiones (1D por simplicidad inicial)
-        buffer.write(struct.pack(context.endianness + 'I', 1))
-
-        # Tamaño de la dimensión
-        buffer.write(struct.pack(context.endianness + 'I', len(self._value)))
+        # Para arrays 1D: solo escribir num_elements
+        # Para arrays 2D+: escribir num_dims + dim_sizes
+        if len(self.dimensions) == 1:
+            # Array 1D: [num_elements] + [elements]
+            buffer.write(struct.pack(context.endianness + 'I', self.dimensions[0]))
+        else:
+            # Array 2D+: [num_dims] [dim1_size] [dim2_size] ... + [elements]
+            buffer.write(struct.pack(context.endianness + 'I', len(self.dimensions)))
+            for dim_size in self.dimensions:
+                buffer.write(struct.pack(context.endianness + 'I', dim_size))
 
         # Serializar elementos
         for elem in self._value:
@@ -339,9 +346,8 @@ class LVCluster(LVType):
         buffer = BytesIO()
         offset = 0
 
-        # Número de elementos
-        buffer.write(struct.pack(context.endianness + 'I', len(self._value)))
-        offset += 4
+        # NO escribir número de elementos - los clusters concatenan datos directamente
+        # Los datos se serializan sin header según la documentación de LabVIEW
 
         # Serializar cada campo con alineación
         for field in self._value:
