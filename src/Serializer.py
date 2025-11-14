@@ -66,9 +66,35 @@ class TypeDescriptor:
 
     @classmethod
     def from_bytes(cls, data: bytes) -> 'TypeDescriptor':
-        """Deserializa desde bytes"""
-        # Implementación inversa
-        pass
+        """Deserializa un Type Descriptor desde bytes"""
+        buffer = BytesIO(data)
+        
+        # Leer ID del tipo
+        td_id_value = struct.unpack('<I', buffer.read(4))[0]
+        td_id = TypeDescriptorID(td_id_value)
+        
+        properties = {}
+        sub_types = []
+        
+        # Leer propiedades y sub-tipos según el tipo
+        if td_id == TypeDescriptorID.ARRAY:
+            # Leer descriptor del elemento
+            elem_data = buffer.read()  # Simplificado
+            if elem_data:
+                sub_types.append(cls.from_bytes(elem_data))
+        
+        elif td_id == TypeDescriptorID.CLUSTER:
+            # Leer número de elementos
+            num_elements = struct.unpack('<I', buffer.read(4))[0]
+            properties['num_elements'] = num_elements
+            
+            # Leer descriptores de cada elemento
+            for _ in range(num_elements):
+                elem_data = buffer.read()  # Simplificado
+                if elem_data:
+                    sub_types.append(cls.from_bytes(elem_data))
+        
+        return cls(td_id, properties, sub_types)
 
 
 # ============================================================================
@@ -383,8 +409,31 @@ class LVObjectMetadata:
 
     def serialize(self, context: SerializationContext) -> bytes:
         """Serializa metadatos según formato de LVObjects"""
-        # Implementación específica del formato de LVObjects.txt
-        pass
+        buffer = BytesIO()
+        
+        # Serializar nombre de librería
+        lib_bytes = self.library.encode('utf-8')
+        buffer.write(struct.pack(context.endianness + 'I', len(lib_bytes)))
+        buffer.write(lib_bytes)
+        
+        # Serializar nombre de clase
+        class_bytes = self.class_name.encode('utf-8')
+        buffer.write(struct.pack(context.endianness + 'I', len(class_bytes)))
+        buffer.write(class_bytes)
+        
+        # Serializar versión (4 componentes uint16)
+        for component in self.version:
+            buffer.write(struct.pack(context.endianness + 'H', component))
+        
+        # Si tiene padre, serializar recursivamente
+        if self.parent:
+            parent_data = self.parent.serialize(context)
+            buffer.write(struct.pack(context.endianness + 'I', len(parent_data)))
+            buffer.write(parent_data)
+        else:
+            buffer.write(struct.pack(context.endianness + 'I', 0))
+        
+        return buffer.getvalue()
 
 
 class LVObject(LVType):
@@ -516,15 +565,159 @@ class LVVariant(LVType):
 
     def _get_type_from_descriptor(self, td: TypeDescriptor) -> type:
         """Mapea TypeDescriptor a clase Python"""
-        # Implementar mapeo inverso
-        pass
+        mapping = {
+            TypeDescriptorID.BOOL_8BIT: LVBoolean,
+            TypeDescriptorID.INT8: lambda: LVNumeric(0, np.int8),
+            TypeDescriptorID.INT16: lambda: LVNumeric(0, np.int16),
+            TypeDescriptorID.INT32: lambda: LVNumeric(0, np.int32),
+            TypeDescriptorID.INT64: lambda: LVNumeric(0, np.int64),
+            TypeDescriptorID.UINT8: lambda: LVNumeric(0, np.uint8),
+            TypeDescriptorID.UINT16: lambda: LVNumeric(0, np.uint16),
+            TypeDescriptorID.UINT32: lambda: LVNumeric(0, np.uint32),
+            TypeDescriptorID.UINT64: lambda: LVNumeric(0, np.uint64),
+            TypeDescriptorID.FLOAT32: lambda: LVNumeric(0.0, np.float32),
+            TypeDescriptorID.FLOAT64: lambda: LVNumeric(0.0, np.float64),
+            TypeDescriptorID.STRING: LVString,
+            TypeDescriptorID.ARRAY: LVArray,
+            TypeDescriptorID.CLUSTER: LVCluster,
+        }
+        
+        type_class = mapping.get(td.td_id)
+        if type_class is None:
+            raise ValueError(f"Unsupported type descriptor: {td.td_id}")
+        
+        # Si es callable (lambda), llamarlo
+        if callable(type_class) and not isinstance(type_class, type):
+            return type(type_class())
+        
+        return type_class
 
     def get_type_descriptor(self) -> TypeDescriptor:
         return TypeDescriptor(TypeDescriptorID.VARIANT)
 
 
 # ============================================================================
-# LAYER 7: High-Level API (API Conveniente)
+# LAYER 7: Auto-Inference Functions
+# ============================================================================
+
+def _auto_infer_type(data: Any) -> LVType:
+    """
+    Infiere automáticamente el tipo LabVIEW desde datos Python.
+    
+    Reglas de inferencia:
+    - bool → LVBoolean
+    - int → LVNumeric(np.int32)
+    - float → LVNumeric(np.float64)
+    - str → LVString
+    - list homogénea → LVArray
+    - list heterogénea → LVCluster (sin nombres)
+    - tuple → LVCluster (sin nombres)
+    - dict → LVCluster (con nombres)
+    - LVType → retornar tal cual
+    """
+    # Si ya es un LVType, retornar directamente
+    if isinstance(data, LVType):
+        return data
+    
+    # Boolean (antes de int, porque bool es subclase de int)
+    if isinstance(data, bool):
+        return LVBoolean(data)
+    
+    # Numéricos
+    if isinstance(data, int):
+        return LVNumeric(data, np.int32)
+    
+    if isinstance(data, float):
+        return LVNumeric(data, np.float64)
+    
+    # String
+    if isinstance(data, str):
+        return LVString(data)
+    
+    # List: detectar si es homogénea o heterogénea
+    if isinstance(data, list):
+        if not data:
+            raise ValueError("Cannot infer type from empty list")
+        
+        # Convertir elementos recursivamente
+        elements = [_auto_infer_type(x) for x in data]
+        
+        # Verificar si todos son del mismo tipo
+        first_type = type(elements[0])
+        if all(isinstance(e, first_type) for e in elements):
+            # Lista homogénea → Array
+            return LVArray(elements, first_type)
+        else:
+            # Lista heterogénea → Cluster sin nombres
+            names = tuple(f"elem_{i}" for i in range(len(elements)))
+            return LVCluster((names, tuple(elements)), named=False)
+    
+    # Tuple: siempre cluster sin nombres
+    if isinstance(data, tuple):
+        if not data:
+            raise ValueError("Cannot infer type from empty tuple")
+        
+        elements = [_auto_infer_type(x) for x in data]
+        names = tuple(f"elem_{i}" for i in range(len(elements)))
+        return LVCluster((names, tuple(elements)), named=False)
+    
+    # Dict: cluster con nombres
+    if isinstance(data, dict):
+        if not data:
+            raise ValueError("Cannot infer type from empty dict")
+        
+        names = tuple(data.keys())
+        values = tuple(_auto_infer_type(v) for v in data.values())
+        return LVCluster((names, values), named=True)
+    
+    raise TypeError(f"Cannot auto-infer LabVIEW type from {type(data)}")
+
+
+def lvflatten(data: Any, context: Optional[SerializationContext] = None) -> bytes:
+    """
+    Serializa automáticamente cualquier dato Python a formato LabVIEW.
+    
+    Args:
+        data: Cualquier tipo Python (int, float, str, list, tuple, dict, nested)
+        context: Contexto de serialización (opcional)
+    
+    Returns:
+        bytes: Datos serializados en formato LabVIEW
+    
+    Examples:
+        >>> lvflatten(42)
+        >>> lvflatten("Hello World")
+        >>> lvflatten([1, 2, 3])
+        >>> lvflatten(("Hello", 1, 0.15, ["a", "b"], [1, 2]))
+        >>> lvflatten({"x": 10, "y": 20, "label": "Point"})
+    """
+    context = context or SerializationContext()
+    lv_type = _auto_infer_type(data)
+    return lv_type.serialize(context)
+
+
+def lvunflatten(data: bytes, type_hint: Optional[type] = None, 
+                context: Optional[SerializationContext] = None) -> Any:
+    """
+    Deserializa datos LabVIEW a tipos Python.
+    
+    Args:
+        data: Bytes en formato LabVIEW
+        type_hint: Tipo esperado (opcional)
+        context: Contexto de deserialización (opcional)
+    
+    Returns:
+        Datos Python deserializados
+    
+    Note:
+        Implementación completa pendiente
+    """
+    # TODO: Implementar deserialización completa
+    raise NotImplementedError("Deserialización completa pendiente")
+
+
+# ============================================================================
+# LAYER 8: High-Level API (API Conveniente)
 # ============================================================================
 
 class LVSerializer:
@@ -564,26 +757,8 @@ class LVSerializer:
             return value
 
     def _to_lv_type(self, obj: Any) -> LVType:
-        """Convierte tipos Python a LVType automáticamente"""
-        if isinstance(obj, LVType):
-            return obj
-        elif isinstance(obj, bool):
-            return LVBoolean(obj)
-        elif isinstance(obj, int):
-            return LVNumeric(obj, np.int32)
-        elif isinstance(obj, float):
-            return LVNumeric(obj, np.float64)
-        elif isinstance(obj, str):
-            return LVString(obj)
-        elif isinstance(obj, (list, tuple)):
-            # Convertir a LVArray
-            if not obj:
-                raise ValueError("Cannot infer array type from empty list")
-            elem_type = type(self._to_lv_type(obj[0]))
-            elements = [self._to_lv_type(x) for x in obj]
-            return LVArray(elements, elem_type)
-        else:
-            raise TypeError(f"Cannot convert {type(obj)} to LVType")
+        """Convierte tipos Python a LVType usando auto-inferencia"""
+        return _auto_infer_type(obj)
 
     def _python_to_lv_type(self, python_type: type) -> type:
         """Mapea tipos Python a clases LVType"""
@@ -711,8 +886,39 @@ def example_high_level_api():
     print(f"Auto-serialized string: {data_str.hex()}")
     print(f"Auto-serialized list: {data_list.hex()}")
 
+
+def example_auto_flatten():
+    """Ejemplo de uso de lvflatten con auto-detección"""
+    print("\n=== Ejemplo de Auto-Flatten ===")
+    
+    # Caso 1: Tu ejemplo original
+    data1 = ("Hello World", 1, 0.15, ["a", "b", "c"], [1, 2, 3])
+    result1 = lvflatten(data1)
+    print(f"Tupla mixta: {result1.hex()}")
+    
+    # Caso 2: Diccionario (cluster con nombres)
+    data2 = {"x": 10, "y": 20, "label": "Point A"}
+    result2 = lvflatten(data2)
+    print(f"Diccionario: {result2.hex()}")
+    
+    # Caso 3: Lista homogénea (array)
+    data3 = [1.0, 2.0, 3.0, 4.0, 5.0]
+    result3 = lvflatten(data3)
+    print(f"Array de floats: {result3.hex()}")
+    
+    # Caso 4: Nested structures
+    data4 = {
+        "header": ("v1.0", 123),
+        "values": [10, 20, 30],
+        "active": True
+    }
+    result4 = lvflatten(data4)
+    print(f"Estructura anidada: {result4.hex()}")
+    
+    print("✅ Auto-flatten funcionando correctamente!")
+
 if __name__ == "__main__":
     example_basic_types()
     example_cluster()
     example_custom_object()
-    #example_high_level_api()
+    example_auto_flatten()  # NUEVO
