@@ -1,0 +1,249 @@
+'''LabVIEW Object''' (also known as ''LV Object'' and ''LV Class'') is the common ancestor for all LabVIEW Classes. All classes in LabVIEW ultimately inherit from LabVIEW Object. It has no state or behavior. The only purpose of this object is to serve as common ancestor for LabVIEW Classes.
+
+==Mutation History==
+The mutation history of a LVClass is the history of changes to the class properties and/or members of the class private data.  As changes are made the changes are automatically recorded in the mutation history.
+
+==Flattened string representation of LabVIEW objects==
+LabVIEW objects can be flattened to string with the [[Flatten To String function]]. Likewise, a flattened string can be unflattened into its object form with the [[Unflatten From String function]]. The data contained in a flattened string follows object-specific rules<ref>[https://lavag.org/topic/7901-flattened-lvoop-class/?tab=comments#comment-46907 Flattened LVOOP Class] by Aristos Queue</ref>, which also allows external applications to produce the data necessary for objects in LabVIEW.
+
+The flattened string contains four elements:
+* NumLevels - The number of levels recorded in the string.
+* ClassName - The fully qualified name of the class.
+* VersionList - A list of version numbers for each contained object.
+* ClusterData - A list of cluster data (state data) for each contained object.
+
+The flattened form of LabVIEW data is readable on any endian platform. All data types are always flattened into little endian order.
+
+===NumLevels===
+The first four bytes represent a unsigned 32-bit integer for the number of levels that are recorded in the string. A value of zero indicates an instance of LabVIEW Object with no further data.
+
+'''Examples'''
+
+This is an example for LabVIEW Object (hexadecimal): <code>0000 0000</code>
+
+This is an example for an object with one level (hexadecimal): <code>0000 0001</code>
+
+===ClassName===
+The next several bytes represent the fully qualified name of the class. The first byte defines the total length of the qualified name, followed by a sequence of [[Pascal String|Pascal]] strings, each representing one segment of the qualified name. The first byte of each Pascal string defines the length of the particular string, followed by the string. The last Pascal string has a length of zero.
+
+ClassName includes zero pad bytes to increase the class name section to a multiple of four bytes.
+
+'''Example'''
+
+This is an example for the [[Actor]] object (hexadecimal):
+
+<code>
+0000 0001 2515 4163
+746F 7220 4672 616D
+6577 6F72 6B2E 6C76
+6C69 620D 4163 746F
+722E 6C76 636C 6173
+7300 0000 0000 0000
+0000 0000
+</code>
+
+{| class="wikitable"
+!
+! Data
+! Description
+|-
+! rowspan="2" | NumLevels
+|-
+| <code>0000 0001</code>
+| NumLevels (1 level)
+|-
+! rowspan="8" | ClassName
+|-
+| <code>25</code>
+| Total length (25h = 37 bytes). The length must be rounded up to the next multiple of four (40 bytes).
+|-
+| <code>15</code>
+| Length of the first Pascal string (15h = 21 bytes).
+|-
+| <code>4163 746F 7220 4672 616D 6577 6F72 6B2E 6C76 6C69 62</code>
+| The first Pascal string ("Actor Framework.lvlib")
+|-
+| <code>0D</code>
+| Length of the second Pascal string (0D = 13 bytes)
+|-
+| <code>4163 746F 722E 6C76 636C 6173 73</code>
+| The second Pascal string ("Actor.lvclass")
+|-
+| <code>00</code>
+| Length of the last Pascal string (00h = 0 bytes). A length of zero indicates the end of ClassName.
+|-
+| <code>0000</code>
+| Padding for the total length to be a multiple of four.
+|-
+! rowspan="2" | Data
+|-
+| <code>0000 0000 0000 0000</code>
+| Remaining data.
+|}
+
+===VersionList===
+The next series of unsigned 16-bit integers represent a list of version numbers. Each version number is a set of four unsigned 16-bit integers, usually written in the format W.X.Y.Z, where W, X, Y and Z are each a unsigned 16-bit integer.
+
+There are NumLevels of version numbers. The first version of ClassName class, followed by the version number for ClassNames's parent class, and so on to the version of the oldest ancestor (not including LabVIEW Object). If NumLevels is equal to one and the version number is equal to 0.0.0.0, then this is the default data of the class. If version is zero for any other value of NumLevels, the string is considered corrupt and the unflatten functions will return an error.
+
+'''Examples'''
+
+This is an example for the [[Actor]] object using default data, so the version number is 0.0.0.0 (hexadecimal):
+
+<code>
+0000 0001 2515 4163
+746F 7220 4672 616D
+6577 6F72 6B2E 6C76
+6C69 620D 4163 746F
+722E 6C76 636C 6173
+7300 0000 0000 0000
+0000 0000
+</code>
+
+This is an example for a child class of Actor that has some state data, so the version numbers are included.
+
+<code>
+0000 0002 2111 416C
+7068 6120 4163 746F
+722E 6C76 6C69 620D
+416C 7068 612E 6C76
+636C 6173 7300 0000
+0001 0000 0000 0001
+0001 0000 0000 0005
+0000 0000 0000 0014
+0000 0000 0000 000C
+4865 6C6C 6F20 576F
+726C 6421
+</code>
+
+{| class="wikitable"
+!
+! Data
+! Description
+|-
+! rowspan="2" | NumLevels
+|-
+| <code>0000 0002</code>
+| NumLevels (2 levels)
+|-
+! rowspan="8" | ClassName
+|-
+| <code>21</code>
+| Total length (21h = 33 bytes). The length must be rounded up to the next multiple of four (36 bytes).
+|-
+| <code>11</code>
+| Length of the first Pascal string (11h = 17 bytes).
+|-
+| <code>416C 7068 6120 4163 746F 722E 6C76 6C69 62</code>
+| The first Pascal string ("Alpha Actor.lvlib")
+|-
+| <code>0D</code>
+| Length of the second Pascal string (0D = 13 bytes)
+|-
+| <code>416C 7068 612E 6C76 636C 6173 73</code>
+| The second Pascal string ("Alpha.lvclass")
+|-
+| <code>00</code>
+| Length of the last Pascal string (00h = 0 bytes). A length of zero indicates the end of ClassName.
+|-
+| <code>0000</code>
+| Padding for the total length to be a multiple of four.
+|-
+! rowspan="3" | VersionList
+|-
+| <code>0001 0000 0000 0001</code>
+| Version number for the first level (1.0.0.1). This is the version number of "Alpha.lvclass".
+|-
+| <code>0001 0000 0000 0005</code>
+| Version number for the second level (1.0.0.5). This is the version number of the parent of "Alpha.lvclass".
+|-
+! rowspan="2" | ClusterData
+|-
+| <code>00 0000 0000 0014 0000 0000 0000 000C 4865 6C6C 6F20 576F 726C 6421</code>
+| Remaining data.
+|}
+
+===ClusterData===
+The remaining data is a series of flattened clusters, one for each level of the hierarchy. The first cluster is that of the <u>oldest</u> ancestor class. Each block of data starts with four bytes interpreted as an 32-bit integer. This integer represents the number of bytes in the data that follows. If this number is zero, the default data is used for this level of the hierarchy. If the number is non-zero then this is the flattened data representation for the private cluster at this level of the inheritance hierarchy. After each cluster there are pad bytes to get the length of the string to a multiple of four.
+
+'''Example'''
+
+In this example, "Alpha.lvclass" is a child of "Actor.lvclass". The private data cluster of "Alpha.lvclass" has two elements, a [[Notifier]] refnum and a string. The string has been initialized to "Hello World!". "Actor.lvclass" has not been initialized, so it carries its default data.
+
+This is the hexadecimal representation for the flattened string of "Alpha.lvclass":
+
+<code>
+0000 0002 2111 416C
+7068 6120 4163 746F
+722E 6C76 6C69 620D
+416C 7068 612E 6C76
+636C 6173 7300 0000
+0001 0000 0000 0001
+0001 0000 0000 0005
+0000 0000 0000 0014
+0000 0000 0000 000C
+4865 6C6C 6F20 576F
+726C 6421
+</code>
+
+{| class="wikitable"
+!
+! Data
+! Description
+|-
+! rowspan="2" | NumLevels
+|-
+| <code>0000 0002</code>
+| NumLevels (2 levels)
+|-
+! rowspan="8" | ClassName
+|-
+| <code>21</code>
+| Total length (21h = 33 bytes). The length must be rounded up to the next multiple of four (36 bytes).
+|-
+| <code>11</code>
+| Length of the first Pascal string (11h = 17 bytes).
+|-
+| <code>416C 7068 6120 4163 746F 722E 6C76 6C69 62</code>
+| The first Pascal string ("Alpha Actor.lvlib")
+|-
+| <code>0D</code>
+| Length of the second Pascal string (0D = 13 bytes)
+|-
+| <code>416C 7068 612E 6C76 636C 6173 73</code>
+| The second Pascal string ("Alpha.lvclass")
+|-
+| <code>00</code>
+| Length of the last Pascal string (00h = 0 bytes). A length of zero indicates the end of ClassName.
+|-
+| <code>0000</code>
+| Padding for the total length to be a multiple of four.
+|-
+! rowspan="3" | VersionList
+|-
+| <code>0001 0000 0000 0001</code>
+| Version number for the first level (1.0.0.1). This is the version number of "Alpha.lvclass".
+|-
+| <code>0001 0000 0000 0005</code>
+| Version number for the second level (1.0.0.5). This is the version number of the parent of "Alpha.lvclass".
+|-
+! rowspan="4" | ClusterData
+|-
+| <code>0000 0000</code>
+| Length of the private data cluster of "Actor.lvclass" (0 bytes). A value of zero bytes indicates that it uses the default value.
+|-
+| <code>0000 0014</code>
+| Length of the private data cluster of "Alpha.lvclass" (14h = 20 bytes).
+|-
+| <code>0000 0000 0000 000C 4865 6C6C 6F20 576F 726C 6421</code>
+| Data for the private data cluster of "Alpha.lvclass".<br><code>0000 0000 0000 000C</code> is the data for the notifier refnum (32-bit).<br><code>4865 6C6C 6F20 576F 726C 6421</code> is the string "Hello World!".
+|}
+
+==References==
+<references/>
+
+{{stub}}
+
+[[Category:Data types]]
+[[Category:Stubs]]
+[[Category:Object-Oriented Programming]]
