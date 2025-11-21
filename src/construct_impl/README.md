@@ -18,9 +18,9 @@ This implementation prioritizes:
 ```
 src/construct_impl/
 ├── __init__.py          # Public API exports
-├── basic_types.py       # Basic type definitions (Phase 1)
-├── compound_types.py    # Arrays and Clusters (Phase 2 - TODO)
-├── objects.py           # LVObject types (Phase 3 - TODO)
+├── basic_types.py       # Basic type definitions (Phase 1) ✅
+├── compound_types.py    # Arrays and Clusters (Phase 2) ✅
+├── objects.py           # LVObject types (Phase 3) ✅
 ├── api.py               # Public API: lvflatten(), lvunflatten()
 └── README.md            # This file
 ```
@@ -132,6 +132,135 @@ value = unflatten_string(data)
 # Boolean
 data = flatten_boolean(True)
 value = unflatten_boolean(data)
+```
+
+### Phase 2: Arrays and Clusters
+
+#### Array 1D
+
+Create 1D arrays with homogeneous elements:
+
+```python
+from src.construct_impl import LVArray1D, LVI32
+
+# Create array construct
+array_construct = LVArray1D(LVI32)
+
+# Serialize
+data = array_construct.build([1, 2, 3])
+print(data.hex())  # 00000003000000010000000200000003
+
+# Deserialize
+values = array_construct.parse(data)  # [1, 2, 3]
+
+# Arrays of strings
+string_array = LVArray1D(LVString)
+data = string_array.build(["Hello", "World"])
+```
+
+#### Array 2D
+
+Create multi-dimensional arrays:
+
+```python
+from src.construct_impl import LVArray2D, LVI32
+
+# Create 2D array construct
+array_construct = LVArray2D(LVI32)
+
+# Serialize 2×3 matrix
+data = array_construct.build([[1, 2, 3], [4, 5, 6]])
+print(data.hex())  # 000000020000000200000003[elements...]
+
+# Deserialize
+matrix = array_construct.parse(data)  # [[1, 2, 3], [4, 5, 6]]
+```
+
+#### Cluster
+
+Create heterogeneous collections (NO header, direct concatenation):
+
+```python
+from src.construct_impl import LVCluster, LVString, LVI32, LVU16
+
+# String + I32 cluster
+cluster = LVCluster(LVString, LVI32)
+data = cluster.build(("Hello, LabVIEW!", 0))
+print(data.hex())  # 0000000f48656c6c6f2c204c61625649455721 00000000
+
+# Deserialize
+values = cluster.parse(data)  # ("Hello, LabVIEW!", 0)
+
+# Multiple types
+cluster = LVCluster(LVI32, LVString, LVI32)
+data = cluster.build((42, "Test", 100))
+```
+
+### Phase 3: LabVIEW Objects
+
+#### Empty Object
+
+```python
+from src.construct_impl import LVObject, create_empty_lvobject
+
+obj_construct = LVObject()
+obj = create_empty_lvobject()
+
+data = obj_construct.build(obj)
+print(data.hex())  # 00000000
+```
+
+#### Single-Level Object
+
+```python
+from src.construct_impl import LVObject, create_lvobject
+
+obj_construct = LVObject()
+obj = create_lvobject(
+    class_names=["Actor Framework.lvlib:Actor.lvclass"],
+    versions=[0x01000000],
+    cluster_data=[b'\x00\x00\x00\x00\x00\x00\x00\x00']
+)
+
+data = obj_construct.build(obj)
+deserialized = obj_construct.parse(data)
+```
+
+#### Three-Level Inheritance
+
+Example: Message → Serializable Msg → echo general Msg
+
+```python
+from src.construct_impl import LVObject, LVCluster, LVString, LVU16, create_lvobject
+
+# Create cluster for level 3 data: "Hello World" + U16(0)
+cluster_construct = LVCluster(LVString, LVU16)
+cluster_data = ("Hello World", 0)
+cluster_bytes = cluster_construct.build(cluster_data)
+
+obj_construct = LVObject()
+obj = create_lvobject(
+    class_names=[
+        "Actor Framework.lvlib:Message.lvclass",
+        "Serializable Message.lvlib:Serializable Msg.lvclass",
+        "Commander.lvlib:echo general Msg.lvclass"
+    ],
+    versions=[
+        0x01000000,  # Level 1: 1.0.0.0
+        0x01000007,  # Level 2: 1.0.0.7
+        0x01000000   # Level 3: 1.0.0.0
+    ],
+    cluster_data=[
+        b'\x00\x00\x00\x00\x00\x00\x00\x00',  # Empty for level 1
+        b'\x00\x00\x00\x00\x00\x00\x00\x00',  # Empty for level 2
+        cluster_bytes  # "Hello World" + U16(0) for level 3
+    ]
+)
+
+data = obj_construct.build(obj)
+deserialized = obj_construct.parse(data)
+print(f"NumLevels: {deserialized['num_levels']}")  # 3
+print(f"Classes: {deserialized['class_names']}")
 ```
 
 ## Binary Formats
@@ -268,51 +397,60 @@ pytest tests/construct_impl/ --cov=src.construct_impl --cov-report=term-missing
 - [x] Boolean with validation
 - [x] String (Pascal String)
 - [x] API functions (lvflatten, lvunflatten)
-- [x] Comprehensive unit tests
+- [x] Comprehensive unit tests (64 tests)
 - [x] Documentation
 
-### Phase 2: Compound Types (TODO)
+### Phase 2: Compound Types ✅ COMPLETED
 
-- [ ] **LVArray1D**: 1D arrays with homogeneous elements
+- [x] **LVArray1D**: 1D arrays with homogeneous elements
+  ```python
+  array_construct = LVArray1D(LVI32)
+  data = array_construct.build([1, 2, 3])
+  # Result: 0000 0003 0000 0001 0000 0002 0000 0003
   ```
-  Format: [num_elements (I32)] + [elements...]
-  Example (3 elements: 1, 2, 3):
-    0000 0003 0000 0001 0000 0002 0000 0003
-  ```
+  Format: `[num_elements (I32)] + [elements...]`
 
-- [ ] **LVArray2D/ND**: Multi-dimensional arrays
+- [x] **LVArray2D**: Multi-dimensional arrays
+  ```python
+  array_construct = LVArray2D(LVI32)
+  data = array_construct.build([[1, 2, 3], [4, 5, 6]])
+  # Result: 0000 0002 0000 0002 0000 0003 [6 elements]
   ```
-  Format: [num_dims (I32)] [dim1_size] [dim2_size] ... + [elements...]
-  Example (2×3 matrix):
-    0000 0002 0000 0002 0000 0003 [6 elements]
-  ```
+  Format: `[num_dims (I32)] [dim1_size] [dim2_size] + [elements...]`
 
-- [ ] **LVCluster**: Heterogeneous collections
+- [x] **LVCluster**: Heterogeneous collections (NO header!)
+  ```python
+  cluster = LVCluster(LVString, LVI32)
+  data = cluster.build(("Hello, LabVIEW!", 0))
+  # Result: 0000 000f 48656c6c6f2c204c61625649455721 00000000
   ```
-  Format: Direct concatenation (NO header!)
-  Example (String "Hello, LabVIEW!" + I32(0)):
-    0000 000f 48656c6c6f2c204c61625649455721 00000000
-    ^^^^^^^^ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^^^^^^
-    length   "Hello, LabVIEW!"                 I32(0)
-  ```
+  Format: Direct concatenation without header
 
-### Phase 3: LVObject Types (TODO)
+- [x] Comprehensive unit tests (24 tests)
+- [x] Examples and documentation
 
-- [ ] **LVObject**: LabVIEW object serialization
+### Phase 3: LVObject Types ✅ COMPLETED
+
+- [x] **LVObject**: LabVIEW object serialization with inheritance
+  ```python
+  obj_construct = LVObject()
+  obj = create_lvobject(
+      class_names=["Actor Framework.lvlib:Actor.lvclass"],
+      versions=[0x01000000],
+      cluster_data=[b'']
+  )
+  data = obj_construct.build(obj)
   ```
-  Format:
-    - NumLevels (I32)
-    - ClassName (Pascal Strings with padding)
-    - VersionList (version numbers)
-    - ClusterData (state data)
   
-  Empty LVObject: 0000 0000
-  Actor Object example in docs/LVObjects.txt
-  ```
-
-- [ ] Object metadata and inheritance support
-- [ ] Version tracking
-- [ ] Cluster data serialization
+- [x] Empty LVObject support (`0000 0000`)
+- [x] Single-level objects (Actor example)
+- [x] Multi-level inheritance (3+ levels)
+- [x] ClassName encoding with Pascal strings
+- [x] VersionList tracking
+- [x] ClusterData for private state
+- [x] Helper functions (create_empty_lvobject, create_lvobject)
+- [x] Comprehensive unit tests (18 tests)
+- [x] Real-world examples (echo general Msg with 3-level inheritance)
 
 ## Implementation Notes
 

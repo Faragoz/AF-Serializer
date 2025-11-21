@@ -20,6 +20,14 @@ Basic Types:
     - LVBoolean
     - LVString
 
+Compound Types:
+    - LVArray1D: 1D arrays
+    - LVArray2D: 2D/multi-dimensional arrays
+    - LVCluster: Heterogeneous collections
+
+Object Types:
+    - LVObject: LabVIEW objects with inheritance support
+
 Usage:
     >>> from src.construct_impl import lvflatten, lvunflatten, LVI32
     >>> data = lvflatten(42)
@@ -57,6 +65,27 @@ from .basic_types import (
     LVStringType,
 )
 
+from .compound_types import (
+    # Compound type factories
+    LVArray1D,
+    LVArray2D,
+    LVCluster,
+    # Type aliases
+    LVArray1DType,
+    LVArray2DType,
+    LVClusterType,
+)
+
+from .objects import (
+    # Object type factory
+    LVObject,
+    # Helper functions
+    create_empty_lvobject,
+    create_lvobject,
+    # Type alias
+    LVObjectType,
+)
+
 __all__ = [
     # Main API
     "lvflatten",
@@ -70,17 +99,29 @@ __all__ = [
     "unflatten_string",
     "flatten_boolean",
     "unflatten_boolean",
-    # Type definitions
+    # Basic type definitions
     "LVI32", "LVU32", "LVI16", "LVU16", "LVI8", "LVU8", "LVI64", "LVU64",
     "LVDouble", "LVSingle",
     "LVBoolean",
     "LVString",
-    # Type aliases
+    # Basic type aliases
     "LVI32Type", "LVU32Type", "LVI16Type", "LVU16Type", "LVI8Type", "LVU8Type",
     "LVI64Type", "LVU64Type",
     "LVDoubleType", "LVSingleType",
     "LVBooleanType",
     "LVStringType",
+    # Compound types
+    "LVArray1D",
+    "LVArray2D",
+    "LVCluster",
+    "LVArray1DType",
+    "LVArray2DType",
+    "LVClusterType",
+    # Object types
+    "LVObject",
+    "create_empty_lvobject",
+    "create_lvobject",
+    "LVObjectType",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
