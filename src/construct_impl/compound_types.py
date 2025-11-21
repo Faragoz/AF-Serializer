@@ -258,28 +258,24 @@ class ClusterAdapter(Adapter):
         
         values = []
         for field_construct in self.field_constructs:
-            # Read enough bytes for this field
-            if hasattr(field_construct, 'sizeof'):
-                try:
-                    size = field_construct.sizeof()
-                    field_bytes = stream.read(size)
-                except:
-                    # For variable-length types, we need to parse to know the size
-                    # Save position and try to parse
-                    pos = stream.tell()
-                    field_bytes = stream.read()
-                    stream = io.BytesIO(obj)
-                    stream.seek(pos)
-                    field_bytes = field_construct.parse_stream(stream)
-                    values.append(field_bytes)
-                    continue
-            else:
-                # Variable length field - parse from stream
-                field_bytes = field_construct.parse_stream(stream)
-                values.append(field_bytes)
-                continue
-            
-            values.append(field_construct.parse(field_bytes))
+            # For variable-length types (like strings), parse directly from stream
+            # For fixed-length types, we can read the exact number of bytes
+            try:
+                # Try to parse directly from stream (works for all types)
+                field_value = field_construct.parse_stream(stream)
+                values.append(field_value)
+            except Exception as e:
+                # If parse_stream fails, try reading fixed size if available
+                if hasattr(field_construct, 'sizeof'):
+                    try:
+                        size = field_construct.sizeof()
+                        field_bytes = stream.read(size)
+                        values.append(field_construct.parse(field_bytes))
+                    except (AttributeError, TypeError):
+                        # sizeof() failed, re-raise original error
+                        raise e
+                else:
+                    raise e
         
         return tuple(values)
     

@@ -78,6 +78,32 @@ class LVObjectAdapter(Adapter):
         self.cluster_constructs = cluster_constructs or []
         super().__init__(GreedyBytes)
     
+    def _calculate_classname_bytes(self, class_names: List[str]) -> int:
+        """
+        Calculate the number of bytes used by class name encoding.
+        
+        Args:
+            class_names: List of fully qualified class names
+        
+        Returns:
+            Total number of bytes including total length, names, and end marker
+        """
+        # 1 byte for total length
+        total = 1
+        
+        # For each class name: 1 byte for library length + library + 1 byte for class length + class
+        for cn in class_names:
+            parts = cn.split(':')
+            library = parts[0]
+            classname = parts[1]
+            total += 1 + len(library.encode('utf-8'))  # Length byte + library
+            total += 1 + len(classname.encode('utf-8'))  # Length byte + class
+        
+        # 1 byte for end marker
+        total += 1
+        
+        return total
+    
     def _decode(self, obj: bytes, context, path) -> dict:
         """Convert bytes to Python dict representing LVObject."""
         import io
@@ -115,8 +141,7 @@ class LVObjectAdapter(Adapter):
         end_marker = stream.read(1)
         
         # Read padding to align to 4-byte boundary
-        # Calculate how much we've read so far for class names
-        bytes_read = 1 + sum(1 + len(cn.split(':')[0]) + 1 + len(cn.split(':')[1]) for cn in class_names) + 1
+        bytes_read = self._calculate_classname_bytes(class_names)
         padding_needed = (4 - (bytes_read % 4)) % 4
         if padding_needed > 0:
             stream.read(padding_needed)
@@ -217,9 +242,8 @@ class LVObjectAdapter(Adapter):
                 # Write raw bytes if no construct available
                 if isinstance(data, bytes):
                     stream.write(data)
-                elif isinstance(data, tuple):
-                    # Try to serialize as best we can
-                    pass
+                # Note: Tuples without construct definitions are not supported.
+                # Users should provide cluster_constructs or pre-serialize to bytes.
         
         return stream.getvalue()
 
