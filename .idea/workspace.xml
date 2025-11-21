@@ -5,9 +5,109 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4d163ab3-28ef-43da-8f7d-d42c40a454e5" name="Changes" comment="Init">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/LVTypes.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/Serializer.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/Serializer.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Serializer.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/auto_flatten.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/construct_impl/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/construct_impl/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/construct_impl/api.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/construct_impl/basic_types.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/construct_impl/compound_types.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/construct_impl/decorators.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/construct_impl/objects.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/decorators.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/decorators.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/descriptors.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/labview-variant-data-main/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/labview-variant-data-main/LICENSE.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/labview-variant-data-main/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/labview-variant-data-main/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/labview-variant-data-main/labview_data/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/labview-variant-data-main/labview_data/type_converters.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/labview-variant-data-main/labview_data/types.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/labview-variant-data-main/labview_data/utils.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/labview-variant-data-main/tests/test_labview_variant.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/.github/workflows/generate-wiki.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/.github/workflows/python-app.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/.idea/copilot.data.migration.agent.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/.idea/copilot.data.migration.ask.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/.idea/copilot.data.migration.ask2agent.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/.idea/copilot.data.migration.edit.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/.idea/inspectionProfiles/profiles_settings.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/.idea/misc.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/.idea/modules.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/.idea/pylabview-master.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/LICENSE" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/examples/blank_project1_extr_from_exe_lv14f1.llb" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/examples/lv14f1/empty_libfile.llb" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/examples/lv14f1/empty_vifile.vi" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/.idea/copilot.data.migration.agent.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/.idea/copilot.data.migration.ask.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/.idea/copilot.data.migration.ask2agent.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/.idea/copilot.data.migration.edit.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/.idea/inspectionProfiles/profiles_settings.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/.idea/misc.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/.idea/modules.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/.idea/pylabview.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/LVblock.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/LVclasses.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/LVcode.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/LVdatafill.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/LVdatatype.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/LVdatatyperef.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/LVheap.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/LVinstrument.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/LVlinkinfo.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/LVmisc.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/LVparts.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/LVrsrcontainer.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/LVxml.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/assets/tom-thumb.pbm" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/assets/tom-thumb.pil" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/assets/tom-thumb.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/modRSRC.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/playground/datatype.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/pylabview/readRSRC.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/setup.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/tests/recreate-vi_lib-llb.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/tests/recreate-vi_lib-vis.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/tests/test_readRSRC_llb.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/wiki/Block-Diagram-Heap-Format.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/wiki/Blocks.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/wiki/Font-Table-Format.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/wiki/Front-Panel-Heap-Format.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/wiki/Help-Data.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/wiki/Home.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/wiki/Icon-Format.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/wiki/Polymorphic.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/wiki/Print-Settings.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/wiki/RSRC-Format.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/wiki/Revision-History.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/wiki/Version-Bits.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/examples/pylabview-master/wiki/XML.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lv_serializer.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/serialization.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/read.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/read2.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/test.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/types/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/types/basic.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/types/compound.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/types/objects.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/types/variant.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/construct_impl/conftest.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/construct_impl/test_basic_types.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/construct_impl/test_compound_types.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/construct_impl/test_decorators.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/construct_impl/test_objects.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_auto_flatten.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_decorators.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_decorators.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_hex_validation.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_module_structure.py" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -29,21 +129,21 @@
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "Faragoz"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;Faragoz&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/Faragoz/AF-Serializer.git",
-    "accountId": "36db686f-8b67-4a2e-890d-9f2b2da5013b"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/Faragoz/AF-Serializer.git&quot;,
+    &quot;accountId&quot;: &quot;36db686f-8b67-4a2e-890d-9f2b2da5013b&quot;
   }
-}]]></component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 3
-}]]></component>
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 3
+}</component>
   <component name="ProjectId" id="35SrT4xtkOu0xRPOpm2jH49kOqU" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -57,7 +157,7 @@
     "Python.hehe.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "main",
+    "git-widget-placeholder": "copilot/featureconstruct-implementation",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -87,6 +187,7 @@
       <option name="presentableId" value="Default" />
       <updated>1763114319061</updated>
       <workItem from="1763114320095" duration="14442000" />
+      <workItem from="1763739568490" duration="11000" />
     </task>
     <task id="LOCAL-00001" summary="Init">
       <option name="closed" value="true" />

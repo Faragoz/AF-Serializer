@@ -1,66 +1,139 @@
 """
-AF-Serializer - LabVIEW data serialization library for Python
+Construct-based LabVIEW Serialization Implementation.
 
-This library provides automatic serialization and deserialization of Python data
-structures to LabVIEW-compatible binary format.
+This module provides an alternative implementation of AF-Serializer using
+the Construct library for declarative binary format definitions.
+
+Key Features:
+    - Declarative type definitions using Construct
+    - Type hints for all functions
+    - Big-endian byte order (network byte order)
+    - Validated against real LabVIEW HEX examples
+
+Public API:
+    - lvflatten: Serialize Python data to LabVIEW format
+    - lvunflatten: Deserialize LabVIEW data to Python
+    
+Basic Types:
+    - LVI32, LVU32, LVI16, LVU16, LVI8, LVU8, LVI64, LVU64
+    - LVDouble, LVSingle
+    - LVBoolean
+    - LVString
+
+Compound Types:
+    - LVArray1D: 1D arrays
+    - LVArray2D: 2D/multi-dimensional arrays
+    - LVCluster: Heterogeneous collections
+
+Object Types:
+    - LVObject: LabVIEW objects with inheritance support
+
+Usage:
+    >>> from src.construct_impl import lvflatten, lvunflatten, LVI32
+    >>> data = lvflatten(42)
+    >>> print(data.hex())
+    0000002a
+    >>> value = lvunflatten(data, LVI32)
+    >>> print(value)
+    42
 """
 
-# Core types
-from .types import (
-    LVType,
-    LVNumeric,
-    LVBoolean,
-    LVString,
-    LVArray,
-    LVCluster,
-    LVObject,
-    LVObjectMetadata,
-    LVVariant,
+from .api import (
+    lvflatten,
+    lvunflatten,
+    flatten_i32,
+    unflatten_i32,
+    flatten_double,
+    unflatten_double,
+    flatten_string,
+    unflatten_string,
+    flatten_boolean,
+    unflatten_boolean,
 )
 
-# Type descriptors
-from .descriptors import TypeDescriptor, TypeDescriptorID
+from .basic_types import (
+    # Construct definitions
+    LVI32, LVU32, LVI16, LVU16, LVI8, LVU8, LVI64, LVU64,
+    LVDouble, LVSingle,
+    LVBoolean,
+    LVString,
+    # Type aliases
+    LVI32Type, LVU32Type, LVI16Type, LVU16Type, LVI8Type, LVU8Type,
+    LVI64Type, LVU64Type,
+    LVDoubleType, LVSingleType,
+    LVBooleanType,
+    LVStringType,
+)
 
-# Serialization context
-from .serialization import SerializationContext, ISerializable
+from .compound_types import (
+    # Compound type factories
+    LVArray1D,
+    LVArray2D,
+    LVCluster,
+    # Type aliases
+    LVArray1DType,
+    LVArray2DType,
+    LVClusterType,
+)
 
-# High-level API
-from .auto_flatten import lvflatten, lvunflatten, _auto_infer_type
-from .lv_serializer import LVSerializer
+from .objects import (
+    # Object type factory
+    LVObject,
+    # Helper functions
+    create_empty_lvobject,
+    create_lvobject,
+    # Type alias
+    LVObjectType,
+)
 
-# Decorators
-from .decorators import lvclass
-
-__version__ = '1.0.0'
+from .decorators import (
+    # Decorators
+    lvclass,
+    lvfield,
+    # Helper function
+    is_lvclass,
+)
 
 __all__ = [
     # Main API
-    'lvflatten',
-    'lvunflatten',
-    'LVSerializer',
-    
-    # Types
-    'LVType',
-    'LVNumeric',
-    'LVBoolean',
-    'LVString',
-    'LVArray',
-    'LVCluster',
-    'LVObject',
-    'LVObjectMetadata',
-    'LVVariant',
-    
-    # Descriptors
-    'TypeDescriptor',
-    'TypeDescriptorID',
-    
-    # Context
-    'SerializationContext',
-    'ISerializable',
-    
+    "lvflatten",
+    "lvunflatten",
+    # Convenience functions
+    "flatten_i32",
+    "unflatten_i32",
+    "flatten_double",
+    "unflatten_double",
+    "flatten_string",
+    "unflatten_string",
+    "flatten_boolean",
+    "unflatten_boolean",
+    # Basic type definitions
+    "LVI32", "LVU32", "LVI16", "LVU16", "LVI8", "LVU8", "LVI64", "LVU64",
+    "LVDouble", "LVSingle",
+    "LVBoolean",
+    "LVString",
+    # Basic type aliases
+    "LVI32Type", "LVU32Type", "LVI16Type", "LVU16Type", "LVI8Type", "LVU8Type",
+    "LVI64Type", "LVU64Type",
+    "LVDoubleType", "LVSingleType",
+    "LVBooleanType",
+    "LVStringType",
+    # Compound types
+    "LVArray1D",
+    "LVArray2D",
+    "LVCluster",
+    "LVArray1DType",
+    "LVArray2DType",
+    "LVClusterType",
+    # Object types
+    "LVObject",
+    "create_empty_lvobject",
+    "create_lvobject",
+    "LVObjectType",
     # Decorators
-    'lvclass',
-    
-    # Internal (for advanced users)
-    '_auto_infer_type',
+    "lvclass",
+    "lvfield",
+    "is_lvclass",
 ]
+
+__version__ = "0.2.1"
