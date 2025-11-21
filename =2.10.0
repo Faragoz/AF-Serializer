@@ -1,0 +1,7 @@
+Defaulting to user installation because normal site-packages is not writeable
+Collecting construct
+  Downloading construct-2.10.70-py3-none-any.whl.metadata (4.2 kB)
+Downloading construct-2.10.70-py3-none-any.whl (63 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 63.0/63.0 kB 18.4 MB/s eta 0:00:00
+Installing collected packages: construct
+Successfully installed construct-2.10.70
