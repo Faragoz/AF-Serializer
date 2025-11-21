@@ -160,8 +160,15 @@ def test_lvobject_three_level_inheritance():
 
 
 def test_lvobject_three_level_class_names():
-    """Test that three-level object has correct class names structure."""
+    """
+    Test that three-level object has correct structure.
+    
+    IMPORTANT: According to LabVIEW spec, only the MOST DERIVED class name
+    is stored in the serialized format, but NumLevels=3 and there are
+    3 versions and 3 cluster data sections.
+    """
     obj_construct = LVObject()
+    # Using old API for backwards compat - it will use the LAST class name
     data = create_lvobject(
         class_names=[
             "Actor Framework.lvlib:Message.lvclass",
@@ -175,11 +182,12 @@ def test_lvobject_three_level_class_names():
     serialized = obj_construct.build(data)
     deserialized = obj_construct.parse(serialized)
     
-    assert deserialized["num_levels"] == 3
-    assert len(deserialized["class_names"]) == 3
-    assert "Message.lvclass" in deserialized["class_names"][0]
-    assert "Serializable Msg.lvclass" in deserialized["class_names"][1]
-    assert "echo general Msg.lvclass" in deserialized["class_names"][2]
+    # Verify correct structure per LabVIEW spec
+    assert deserialized["num_levels"] == 3  # 3 levels of inheritance
+    assert len(deserialized["class_names"]) == 1  # But only ONE class name (most derived)
+    assert "echo general Msg.lvclass" in deserialized["class_name"]  # The most derived class
+    assert len(deserialized["versions"]) == 3  # 3 versions (one per level)
+    assert len(deserialized["cluster_data"]) == 3  # 3 data sections (one per level)
 
 
 def test_lvobject_versions():
@@ -282,7 +290,12 @@ def test_lvobject_multiple_versions():
 
 @pytest.mark.parametrize("num_levels", [1, 2, 3, 4, 5])
 def test_lvobject_various_inheritance_depths(num_levels):
-    """Test LVObject with various inheritance depths."""
+    """
+    Test LVObject with various inheritance depths.
+    
+    Per LabVIEW spec: Only the MOST DERIVED class name is serialized,
+    but NumLevels, versions, and cluster_data all have entries for ALL levels.
+    """
     class_names = [f"Level{i}.lvlib:Class{i}.lvclass" for i in range(num_levels)]
     versions = [0x01000000] * num_levels
     cluster_data = [b''] * num_levels
@@ -294,5 +307,6 @@ def test_lvobject_various_inheritance_depths(num_levels):
     deserialized = obj_construct.parse(serialized)
     
     assert deserialized["num_levels"] == num_levels
-    assert len(deserialized["class_names"]) == num_levels
-    assert len(deserialized["versions"]) == num_levels
+    assert len(deserialized["class_names"]) == 1  # Only ONE class name
+    assert len(deserialized["versions"]) == num_levels  # But num_levels versions
+    assert len(deserialized["cluster_data"]) == num_levels  # And num_levels data sections

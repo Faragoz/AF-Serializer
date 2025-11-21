@@ -47,9 +47,13 @@ class LVObjectAdapter(Adapter):
     
     LabVIEW objects support inheritance and contain:
     1. NumLevels (I32): Number of inheritance levels (0 for empty object)
-    2. ClassName: Encoded class hierarchy
-    3. VersionList: Version for each level
-    4. ClusterData: Private data for each level
+    2. ClassName: ONLY the most derived class name (library:class format)
+    3. VersionList: Version for EACH level (including all parents)
+    4. ClusterData: Private data for EACH level (including all parents)
+    
+    IMPORTANT: The ClassName field contains ONLY the final derived class,
+    not the full inheritance chain. However, NumLevels indicates how many
+    levels exist, and VersionList/ClusterData have entries for all levels.
     
     Example - Empty LVObject:
         0000 0000
@@ -62,9 +66,10 @@ class LVObjectAdapter(Adapter):
     
     Example - Three-level inheritance (Message -> Serializable Msg -> echo general Msg):
         NumLevels: 0000 0003 (3 levels)
-        ClassName: [detailed class names]
-        VersionList: 01000000 01000007 01000000 (versions for each level)
-        ClusterData: [empty] [empty] [0x11 "Hello World" 0x00]
+        ClassName: 2A 0F "Commander.lvlib" 18 "echo general Msg.lvclass" 00 [padding]
+                   (ONLY the most derived class, not Message or Serializable Msg)
+        VersionList: 01000000 01000007 01000000 (3 versions, one per level)
+        ClusterData: [empty] [empty] [0x11 "Hello World" 0x00] (3 data sections)
     """
     
     def __init__(self, cluster_constructs: Optional[List[Construct]] = None):
@@ -78,32 +83,7 @@ class LVObjectAdapter(Adapter):
         self.cluster_constructs = cluster_constructs or []
         super().__init__(GreedyBytes)
     
-    def _calculate_classname_bytes(self, class_names: List[str]) -> int:
-        """
-        Calculate the number of bytes used by class name encoding.
-        
-        Args:
-            class_names: List of fully qualified class names
-        
-        Returns:
-            Total number of bytes including total length, names, and end marker
-        """
-        # 1 byte for total length
-        total = 1
-        
-        # For each class name: 1 byte for library length + library + 1 byte for class length + class
-        for cn in class_names:
-            parts = cn.split(':')
-            library = parts[0]
-            classname = parts[1]
-            total += 1 + len(library.encode('utf-8'))  # Length byte + library
-            total += 1 + len(classname.encode('utf-8'))  # Length byte + class
-        
-        # 1 byte for end marker
-        total += 1
-        
-        return total
-    
+
     def _decode(self, obj: bytes, context, path) -> dict:
         """Convert bytes to Python dict representing LVObject."""
         import io
@@ -114,39 +94,40 @@ class LVObjectAdapter(Adapter):
         num_levels = Int32ub.parse(num_levels_bytes)
         
         if num_levels == 0:
-            # Empty object
+            # Empty object - maintain backwards compat with class_names
             return {
                 "num_levels": 0,
-                "class_names": [],
+                "class_name": None,
+                "class_names": [],  # Backwards compatibility
                 "versions": [],
                 "cluster_data": []
             }
         
-        # Read ClassName section
+        # Read ClassName section (ONLY the most derived class)
         total_length = Int8ub.parse(stream.read(1))
         
-        class_names = []
-        for _ in range(num_levels):
-            # Read library name (Pascal string)
-            lib_length = Int8ub.parse(stream.read(1))
-            library = stream.read(lib_length).decode('utf-8')
-            
-            # Read class name (Pascal string)
-            class_length = Int8ub.parse(stream.read(1))
-            classname = stream.read(class_length).decode('utf-8')
-            
-            class_names.append(f"{library}:{classname}")
+        # Read library name (Pascal string)
+        lib_length = Int8ub.parse(stream.read(1))
+        library = stream.read(lib_length).decode('utf-8')
+        
+        # Read class name (Pascal string)
+        class_length = Int8ub.parse(stream.read(1))
+        classname = stream.read(class_length).decode('utf-8')
+        
+        # Store only the most derived class name
+        class_name = f"{library}:{classname}"
         
         # Read end marker
         end_marker = stream.read(1)
         
         # Read padding to align to 4-byte boundary
-        bytes_read = self._calculate_classname_bytes(class_names)
+        # Calculate bytes: 1 (total_length) + actual string bytes + 1 (end marker)
+        bytes_read = 1 + lib_length + 1 + class_length + 1 + 1
         padding_needed = (4 - (bytes_read % 4)) % 4
         if padding_needed > 0:
             stream.read(padding_needed)
         
-        # Read VersionList (4 bytes per level)
+        # Read VersionList (4 bytes per level - for ALL levels including parents)
         versions = []
         for _ in range(num_levels):
             version_bytes = stream.read(4)
@@ -154,24 +135,30 @@ class LVObjectAdapter(Adapter):
             version = Int32ub.parse(version_bytes)
             versions.append(version)
         
-        # Read ClusterData for each level
+        # Read ClusterData for each level (ALL levels including parents)
         cluster_data = []
         for i in range(num_levels):
             if i < len(self.cluster_constructs):
                 data = self.cluster_constructs[i].parse_stream(stream)
                 cluster_data.append(data)
             else:
-                # Try to read remaining data or assume empty
-                # For empty clusters, LabVIEW may include padding
-                remaining = stream.read()
-                cluster_data.append(remaining)
-                break
+                # No construct definition - read remaining data as bytes
+                # For the last level, read all remaining
+                # For intermediate levels, assume empty (8 bytes of zeros is common)
+                if i == num_levels - 1:
+                    remaining = stream.read()
+                    cluster_data.append(remaining)
+                else:
+                    # Try to read a chunk (8 bytes is common for empty clusters)
+                    chunk = stream.read(8)
+                    cluster_data.append(chunk if chunk else b'')
         
         return {
             "num_levels": num_levels,
-            "class_names": class_names,
-            "versions": versions,
-            "cluster_data": cluster_data
+            "class_name": class_name,  # Only the most derived class
+            "class_names": [class_name],  # Backwards compatibility - list with single item
+            "versions": versions,  # All levels
+            "cluster_data": cluster_data  # All levels
         }
     
     def _encode(self, obj: dict, context, path) -> bytes:
@@ -188,38 +175,34 @@ class LVObjectAdapter(Adapter):
             # Empty object
             return stream.getvalue()
         
-        class_names = obj.get("class_names", [])
+        # Get the most derived class name (could be single string or last in list for backwards compat)
+        class_name_data = obj.get("class_name") or (obj.get("class_names", [])[-1] if obj.get("class_names") else "")
         versions = obj.get("versions", [])
         cluster_data = obj.get("cluster_data", [])
         
-        # Calculate total length for ClassName section
-        total_length = 0
-        for cn in class_names:
-            parts = cn.split(':')
-            library = parts[0]
-            classname = parts[1]
-            total_length += 1 + len(library.encode('utf-8'))  # Length byte + library
-            total_length += 1 + len(classname.encode('utf-8'))  # Length byte + class
+        # Parse the class name (library:class format)
+        parts = class_name_data.split(':')
+        library = parts[0]
+        classname = parts[1]
+        
+        # Calculate total length for ClassName section (ONLY the most derived class)
+        total_length = 1 + len(library.encode('utf-8'))  # Length byte + library
+        total_length += 1 + len(classname.encode('utf-8'))  # Length byte + class
         total_length += 1  # End marker
         
         # Write total length
         stream.write(Int8ub.build(total_length))
         
-        # Write class names
-        for cn in class_names:
-            parts = cn.split(':')
-            library = parts[0]
-            classname = parts[1]
-            
-            # Write library (Pascal string)
-            lib_bytes = library.encode('utf-8')
-            stream.write(Int8ub.build(len(lib_bytes)))
-            stream.write(lib_bytes)
-            
-            # Write class name (Pascal string)
-            class_bytes = classname.encode('utf-8')
-            stream.write(Int8ub.build(len(class_bytes)))
-            stream.write(class_bytes)
+        # Write the most derived class name only
+        # Write library (Pascal string)
+        lib_bytes = library.encode('utf-8')
+        stream.write(Int8ub.build(len(lib_bytes)))
+        stream.write(lib_bytes)
+        
+        # Write class name (Pascal string)
+        class_bytes = classname.encode('utf-8')
+        stream.write(Int8ub.build(len(class_bytes)))
+        stream.write(class_bytes)
         
         # Write end marker
         stream.write(b'\x00')
@@ -277,21 +260,18 @@ def LVObject(cluster_constructs: Optional[List[Construct]] = None) -> Construct:
         >>> obj_construct = LVObject()
         >>> data = obj_construct.build({
         ...     "num_levels": 1,
-        ...     "class_names": ["Actor Framework.lvlib:Actor.lvclass"],
+        ...     "class_name": "Actor Framework.lvlib:Actor.lvclass",
         ...     "versions": [0x01000000],
         ...     "cluster_data": [b'']
         ... })
     
     Example - Three-level inheritance:
         >>> # Message -> Serializable Msg -> echo general Msg
+        >>> # Only the MOST DERIVED class name is stored!
         >>> obj_construct = LVObject()
         >>> data = obj_construct.build({
         ...     "num_levels": 3,
-        ...     "class_names": [
-        ...         "Actor Framework.lvlib:Message.lvclass",
-        ...         "Serializable Message.lvlib:Serializable Msg.lvclass",
-        ...         "Commander.lvlib:echo general Msg.lvclass"
-        ...     ],
+        ...     "class_name": "Commander.lvlib:echo general Msg.lvclass",
         ...     "versions": [0x01000000, 0x01000007, 0x01000000],
         ...     "cluster_data": [b'', b'', ...]
         ... })
@@ -312,39 +292,99 @@ def create_empty_lvobject() -> dict:
     """
     return {
         "num_levels": 0,
-        "class_names": [],
+        "class_name": None,
+        "class_names": [],  # Backwards compatibility
         "versions": [],
         "cluster_data": []
     }
 
 
-def create_lvobject(class_names: List[str], versions: List[int], 
-                    cluster_data: Optional[List] = None) -> dict:
+def create_lvobject(class_name_or_names = None, 
+                    versions_or_num_levels = None,
+                    cluster_data: Optional[List] = None,
+                    **kwargs) -> dict:
     """
     Create a LabVIEW Object with inheritance.
     
+    IMPORTANT: The class_name parameter should contain ONLY the most derived
+    class name (library:class format), NOT the full inheritance chain.
+    However, num_levels indicates how many inheritance levels exist, and
+    versions/cluster_data should have entries for ALL levels.
+    
+    Supports both old and new APIs:
+    - Old: create_lvobject(class_names_list, versions_list, cluster_data_list)
+    - New: create_lvobject(class_name=str, num_levels=int, versions=list, cluster_data=list)
+    
     Args:
-        class_names: List of fully qualified class names (library:class format)
-        versions: List of version integers for each level
-        cluster_data: Optional list of private data for each level
+        class_name_or_names: Either a single class name (str) or list of class names (for old API)
+        versions_or_num_levels: Either list of versions or num_levels (int)
+        cluster_data: Optional list of private data for EACH level
+        **kwargs: Keyword arguments for new API (class_name, num_levels, versions, class_names)
     
     Returns:
         Dictionary representing an LVObject
     
-    Example:
+    Example (new API - single level):
         >>> obj = create_lvobject(
-        ...     ["Actor Framework.lvlib:Actor.lvclass"],
-        ...     [0x01000000],
-        ...     [b'']
+        ...     class_name="Actor Framework.lvlib:Actor.lvclass",
+        ...     num_levels=1,
+        ...     versions=[0x01000000],
+        ...     cluster_data=[b'']
+        ... )
+    
+    Example (new API - three-level inheritance: Message -> Serializable Msg -> echo general Msg):
+        >>> obj = create_lvobject(
+        ...     class_name="Commander.lvlib:echo general Msg.lvclass",  # Only most derived
+        ...     num_levels=3,  # But indicates 3 levels total
+        ...     versions=[0x01000000, 0x01000007, 0x01000000],  # 3 versions
+        ...     cluster_data=[b'', b'', cluster_bytes]  # 3 data sections
+        ... )
+    
+    Example (old API - backwards compatibility):
+        >>> obj = create_lvobject(
+        ...     ["Level1.lvlib:Class1.lvclass", "Level2.lvlib:Class2.lvclass"],
+        ...     [0x01000000, 0x01000000],
+        ...     [b'', b'']
         ... )
     """
-    num_levels = len(class_names)
-    if cluster_data is None:
-        cluster_data = [b''] * num_levels
+    # Determine if using old API (positional with list) or new API (keyword args)
+    class_names_kwarg = kwargs.get('class_names')
+    class_name_kwarg = kwargs.get('class_name')
+    num_levels_kwarg = kwargs.get('num_levels')
+    versions_kwarg = kwargs.get('versions')
+    
+    # Old API detection: first arg is a list
+    if isinstance(class_name_or_names, list):
+        # Old API: create_lvobject(class_names_list, versions_list, cluster_data_list)
+        class_names = class_name_or_names
+        versions = versions_or_num_levels if versions_or_num_levels is not None else []
+        num_levels = len(class_names)
+        class_name = class_names[-1] if class_names else ""
+        if cluster_data is None:
+            cluster_data = [b''] * num_levels
+    elif class_names_kwarg is not None:
+        # Keyword arg with old name: class_names=list
+        class_names = class_names_kwarg
+        versions = versions_kwarg if versions_kwarg is not None else []
+        num_levels = len(class_names)
+        class_name = class_names[-1] if class_names else ""
+        if cluster_data is None:
+            cluster_data = [b''] * num_levels
+    else:
+        # New API: class_name=str, num_levels=int
+        class_name = class_name_kwarg or class_name_or_names
+        num_levels = num_levels_kwarg or (versions_or_num_levels if isinstance(versions_or_num_levels, int) else 1)
+        versions = versions_kwarg or (versions_or_num_levels if isinstance(versions_or_num_levels, list) else [0x01000000] * num_levels)
+        
+        if class_name is None:
+            raise ValueError("class_name is required")
+        if cluster_data is None:
+            cluster_data = [b''] * num_levels
     
     return {
         "num_levels": num_levels,
-        "class_names": class_names,
+        "class_name": class_name,
+        "class_names": [class_name],  # Backwards compatibility
         "versions": versions,
         "cluster_data": cluster_data
     }

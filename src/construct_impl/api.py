@@ -36,12 +36,15 @@ def lvflatten(data: Any, type_hint: Optional[Construct] = None) -> bytes:
     This function converts Python data types to their LabVIEW binary
     representation using big-endian byte order.
     
+    Supports @lvclass decorated objects for automatic LVObject serialization.
+    
     Args:
         data: Data to serialize. Supported types:
             - int: Serialized as I32 by default
             - float: Serialized as Double by default
             - str: Serialized as String (Pascal String with Int32ub prefix)
             - bool: Serialized as Boolean (0x00 or 0x01)
+            - @lvclass decorated object: Serialized as LVObject
         type_hint: Optional explicit Construct type definition.
             If provided, this overrides auto-detection.
             Examples: LVI32, LVDouble, LVString, LVBoolean
@@ -69,6 +72,17 @@ def lvflatten(data: Any, type_hint: Optional[Construct] = None) -> bytes:
         >>> lvflatten(True)  # Auto-detect as Boolean
         b'\\x01'
     """
+    # Check if data is a @lvclass decorated object
+    if hasattr(data.__class__, '__is_lv_class__') and data.__class__.__is_lv_class__:
+        # Auto-serialize using the to_bytes method
+        if hasattr(data, 'to_bytes'):
+            return data.to_bytes()
+        else:
+            raise TypeError(
+                f"Object of type {type(data).__name__} is marked as LabVIEW class "
+                f"but doesn't have to_bytes() method"
+            )
+    
     # Use provided type hint or auto-detect
     if type_hint is None:
         # Auto-detect type from Python data
@@ -77,7 +91,7 @@ def lvflatten(data: Any, type_hint: Optional[Construct] = None) -> bytes:
             raise TypeError(
                 f"Unsupported data type: {data_type.__name__}. "
                 f"Supported types: {', '.join(t.__name__ for t in _TYPE_MAP.keys())}. "
-                f"Provide an explicit type_hint for custom types."
+                f"Provide an explicit type_hint for custom types or use @lvclass decorator."
             )
         type_hint = _TYPE_MAP[data_type]
     

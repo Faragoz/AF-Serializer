@@ -86,6 +86,14 @@ from .objects import (
     LVObjectType,
 )
 
+from .decorators import (
+    # Decorators
+    lvclass,
+    lvfield,
+    # Helper function
+    is_lvclass,
+)
+
 __all__ = [
     # Main API
     "lvflatten",
@@ -122,6 +130,10 @@ __all__ = [
     "create_empty_lvobject",
     "create_lvobject",
     "LVObjectType",
+    # Decorators
+    "lvclass",
+    "lvfield",
+    "is_lvclass",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
