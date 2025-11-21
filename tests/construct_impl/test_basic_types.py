@@ -5,6 +5,7 @@ These tests validate serialization and deserialization of basic LabVIEW types
 against real HEX examples from LabVIEW documentation.
 """
 
+import math
 import pytest
 from construct import ValidationError, ConstructError
 
@@ -513,7 +514,6 @@ def test_double_special_values():
     assert deserialized == float('-inf')
     
     # Test NaN (NaN != NaN, so check using math.isnan)
-    import math
     serialized = lvflatten(float('nan'), LVDouble)
     deserialized = lvunflatten(serialized, LVDouble)
     assert math.isnan(deserialized)

@@ -40,4 +40,6 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
-=2.10.0
+
+# mypy
+.mypy_cache/
