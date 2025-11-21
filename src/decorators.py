@@ -69,7 +69,7 @@ def lvclass(library: str = "", class_name: Optional[str] = None,
         >>> msg = EchoMsg()
         >>> msg.message = "Hello World"
         >>> msg.code = 0
-        >>> from src.construct_impl.api import lvflatten
+        >>> from api import lvflatten
         >>> data = lvflatten(msg)  # Auto-serializes with 3 levels
     """
     def decorator(cls):

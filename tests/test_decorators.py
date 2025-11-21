@@ -7,9 +7,9 @@ and enables automatic serialization.
 
 import pytest
 
-from construct_impl import (
-    lvclass, lvfield, is_lvclass, lvflatten, lvunflatten,
-    LVObject, LVI32, LVString, LVU16,
+from src import (
+    lvfield, is_lvclass, lvflatten, lvunflatten,
+    LVObject, LVI32, LVString, LVU16, lvclass,
 )
 
 

@@ -115,8 +115,8 @@ class LVObjectAdapter(Adapter):
         class_length = Int8ub.parse(stream.read(1))
         classname = stream.read(class_length).decode('utf-8')
         
-        # Store only the most derived class name
-        class_name = f"{library}:{classname}"
+        # Store only the most derived class name (library is not mandatory)
+        class_name = classname if not library else f"{library}:{classname}"
         
         # Read end marker
         end_marker = stream.read(1)
@@ -187,9 +187,13 @@ class LVObjectAdapter(Adapter):
         cluster_data = obj.get("cluster_data", [])
         
         # Parse the class name (library:class format)
-        parts = class_name_data.split(':')
-        library = parts[0]
-        classname = parts[1]
+        if ':' in class_name_data:
+            parts = class_name_data.split(':', 1)  # Limiter à 1 split pour éviter les erreurs
+            library = parts[0]
+            classname = parts[1]
+        else:
+            library = ""
+            classname = class_name_data
         
         # Calculate total length for ClassName section (ONLY the most derived class)
         total_length = 1 + len(library.encode('utf-8'))  # Length byte + library
@@ -228,6 +232,7 @@ class LVObjectAdapter(Adapter):
                 stream.write(Int16ub.build(version[2]))
                 stream.write(Int16ub.build(version[3]))
             else:
+                # TODO: Delete legacy support later
                 # Legacy format: single I32 value
                 # Convert to tuple format
                 v = version if isinstance(version, int) else 0

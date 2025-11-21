@@ -5,7 +5,7 @@ Examples demonstrating the @lvclass decorator for easy LabVIEW Object serializat
 This script shows how to use decorators to convert Python classes to LabVIEW Objects.
 """
 
-from src.construct_impl import (
+from src import (
     lvclass, lvflatten, lvunflatten, LVObject,
 )
 
