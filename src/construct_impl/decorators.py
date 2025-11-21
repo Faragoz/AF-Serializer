@@ -115,7 +115,8 @@ def lvclass(library: str = "", class_name: Optional[str] = None,
             
             # Create appropriate number of cluster data entries
             # For derived class (level N), put data there. Parents get empty data.
-            cluster_data_list = [b'\x00' * 8] * (self.__lv_num_levels__ - 1) + [cluster_bytes]
+            EMPTY_CLUSTER_SIZE = 8  # LabVIEW standard for empty cluster padding
+            cluster_data_list = [b'\x00' * EMPTY_CLUSTER_SIZE] * (self.__lv_num_levels__ - 1) + [cluster_bytes]
             
             # Create versions list (all levels get same version for now)
             version_int = (self.__lv_version__[0] << 24 | 

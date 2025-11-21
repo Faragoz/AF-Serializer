@@ -149,8 +149,9 @@ class LVObjectAdapter(Adapter):
                     remaining = stream.read()
                     cluster_data.append(remaining)
                 else:
-                    # Try to read a chunk (8 bytes is common for empty clusters)
-                    chunk = stream.read(8)
+                    # Try to read a chunk (8 bytes is common for empty clusters in LabVIEW)
+                    EMPTY_CLUSTER_SIZE = 8  # LabVIEW standard for empty cluster padding
+                    chunk = stream.read(EMPTY_CLUSTER_SIZE)
                     cluster_data.append(chunk if chunk else b'')
         
         return {
