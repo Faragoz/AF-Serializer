@@ -12,14 +12,15 @@ LabVIEW Objects contain:
 Format Details:
     - NumLevels (I32): 0x00000000 for empty LabVIEW Object
     - ClassName: Total length (I8) + Pascal Strings + End marker (0x00) + Padding
-    - VersionList: 4 bytes (I32) per level representing version (major, minor, patch, build)
-    - ClusterData: Concatenated cluster data for each inheritance level
+    - VersionList: 8 bytes per level (4 x I16: major, minor, patch, build)
+    - ClusterData: Size (I32) + data for each inheritance level
 """
 
 from typing import TypeAlias, Annotated, List, Tuple, Optional
 from construct import (
     Struct,
     Int8ub,
+    Int16ub,
     Int32ub,
     Bytes,
     GreedyBytes,
@@ -127,32 +128,36 @@ class LVObjectAdapter(Adapter):
         if padding_needed > 0:
             stream.read(padding_needed)
         
-        # Read VersionList (4 bytes per level - for ALL levels including parents)
+        # Read VersionList (8 bytes per level: 4 x I16 - for ALL levels including parents)
         versions = []
         for _ in range(num_levels):
-            version_bytes = stream.read(4)
-            # Version format: [major][minor][patch][build] as single bytes
-            version = Int32ub.parse(version_bytes)
-            versions.append(version)
+            # Version format: major(I16) minor(I16) patch(I16) build(I16)
+            major = Int16ub.parse_stream(stream)
+            minor = Int16ub.parse_stream(stream)
+            patch = Int16ub.parse_stream(stream)
+            build = Int16ub.parse_stream(stream)
+            # Store as tuple for easier handling
+            versions.append((major, minor, patch, build))
         
         # Read ClusterData for each level (ALL levels including parents)
+        # Format: size (I32) + data
         cluster_data = []
         for i in range(num_levels):
-            if i < len(self.cluster_constructs):
-                data = self.cluster_constructs[i].parse_stream(stream)
-                cluster_data.append(data)
-            else:
-                # No construct definition - read remaining data as bytes
-                # For the last level, read all remaining
-                # For intermediate levels, assume empty (8 bytes of zeros is common)
-                if i == num_levels - 1:
-                    remaining = stream.read()
-                    cluster_data.append(remaining)
+            # Read cluster size
+            size = Int32ub.parse_stream(stream)
+            
+            if size > 0:
+                # Read the actual cluster data
+                if i < len(self.cluster_constructs):
+                    # Use provided construct to parse
+                    data = self.cluster_constructs[i].parse(stream.read(size))
+                    cluster_data.append(data)
                 else:
-                    # Try to read a chunk (8 bytes is common for empty clusters in LabVIEW)
-                    EMPTY_CLUSTER_SIZE = 8  # LabVIEW standard for empty cluster padding
-                    chunk = stream.read(EMPTY_CLUSTER_SIZE)
-                    cluster_data.append(chunk if chunk else b'')
+                    # No construct, store raw bytes
+                    cluster_data.append(stream.read(size))
+            else:
+                # Empty cluster
+                cluster_data.append(b'')
         
         return {
             "num_levels": num_levels,
@@ -214,20 +219,43 @@ class LVObjectAdapter(Adapter):
         if padding_needed > 0:
             stream.write(b'\x00' * padding_needed)
         
-        # Write VersionList
+        # Write VersionList (8 bytes per version: 4 x I16)
         for version in versions:
-            stream.write(Int32ub.build(version))
-        
-        # Write ClusterData
-        for i, data in enumerate(cluster_data):
-            if i < len(self.cluster_constructs):
-                stream.write(self.cluster_constructs[i].build(data))
+            if isinstance(version, tuple) and len(version) == 4:
+                # Version as tuple (major, minor, patch, build)
+                stream.write(Int16ub.build(version[0]))
+                stream.write(Int16ub.build(version[1]))
+                stream.write(Int16ub.build(version[2]))
+                stream.write(Int16ub.build(version[3]))
             else:
-                # Write raw bytes if no construct available
-                if isinstance(data, bytes):
-                    stream.write(data)
-                # Note: Tuples without construct definitions are not supported.
-                # Users should provide cluster_constructs or pre-serialize to bytes.
+                # Legacy format: single I32 value
+                # Convert to tuple format
+                v = version if isinstance(version, int) else 0
+                major = (v >> 24) & 0xFF
+                minor = (v >> 16) & 0xFF
+                patch = (v >> 8) & 0xFF
+                build = v & 0xFF
+                stream.write(Int16ub.build(major))
+                stream.write(Int16ub.build(minor))
+                stream.write(Int16ub.build(patch))
+                stream.write(Int16ub.build(build))
+        
+        # Write ClusterData (with size prefix for each cluster)
+        for i, data in enumerate(cluster_data):
+            # Serialize cluster data to bytes first
+            if i < len(self.cluster_constructs):
+                cluster_bytes = self.cluster_constructs[i].build(data)
+            elif isinstance(data, bytes):
+                cluster_bytes = data
+            else:
+                # Empty cluster
+                cluster_bytes = b''
+            
+            # Write size prefix
+            stream.write(Int32ub.build(len(cluster_bytes)))
+            # Write data
+            if len(cluster_bytes) > 0:
+                stream.write(cluster_bytes)
         
         return stream.getvalue()
 

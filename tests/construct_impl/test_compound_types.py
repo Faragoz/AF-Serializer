@@ -8,7 +8,7 @@ from LabVIEW documentation.
 import pytest
 from construct import ConstructError
 
-from src.construct_impl import (
+from construct_impl import (
     LVI32, LVU16, LVString,
     LVArray1D, LVArray2D, LVCluster,
 )

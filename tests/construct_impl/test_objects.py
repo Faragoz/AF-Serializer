@@ -7,7 +7,7 @@ real HEX examples from LabVIEW documentation.
 
 import pytest
 
-from src.construct_impl import (
+from construct_impl import (
     LVObject, LVI32, LVU16, LVString, LVCluster,
     create_empty_lvobject, create_lvobject,
 )

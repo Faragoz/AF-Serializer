@@ -10,57 +10,73 @@ from functools import wraps
 import inspect
 
 from .objects import create_lvobject, LVObject
-from .basic_types import LVI32, LVString, LVBoolean, LVDouble
+from .basic_types import (
+    LVI32, LVU32, LVI16, LVU16, LVI8, LVU8, LVI64, LVU64,
+    LVString, LVBoolean, LVDouble, LVSingle
+)
 from .compound_types import LVCluster
 
 
 def lvclass(library: str = "", class_name: Optional[str] = None, 
-            version: tuple = (1, 0, 0, 0), num_levels: int = 1):
+            version: tuple = (1, 0, 0, 0)):
     """
     Decorator to mark a Python class as a LabVIEW Object.
     
     This decorator enables automatic serialization of Python class instances
     to LabVIEW Object format using the construct_impl system.
     
+    The decorator automatically detects inheritance from other @lvclass decorated
+    classes and determines the number of levels, versions, and cluster data.
+    
     Args:
-        library: LabVIEW library name (without .lvlib extension)
+        library: LabVIEW library name (without .lvlib extension).
+                Optional - defaults to empty string.
         class_name: LabVIEW class name (without .lvclass extension). 
                    If None, uses the Python class name.
-        version: Version tuple (major, minor, patch, build)
-        num_levels: Number of inheritance levels (1 for single level,
-                   more if inheriting from LabVIEW parent classes)
+        version: Version tuple (major, minor, patch, build).
+                Optional - defaults to (1, 0, 0, 0).
     
     The decorator:
     - Stores LabVIEW metadata on the class
+    - Auto-detects inheritance levels from decorated base classes
+    - Collects versions from entire inheritance chain
+    - Serializes based on Type Hints for cluster fields
     - Enables automatic serialization via lvflatten()
-    - Supports inheritance hierarchies
     
     Examples:
-        Basic usage:
+        Simple class:
         >>> @lvclass(library="MyLib", class_name="MyClass")
         >>> class MyClass:
         >>>     message: str = ""
         >>>     count: int = 0
         
-        With inheritance (3 levels: Message -> Serializable Msg -> echo general Msg):
-        >>> @lvclass(library="Commander", class_name="echo general Msg", 
-        ...          version=(1,0,0,7), num_levels=3)
-        >>> class EchoGeneralMsg:
-        >>>     message: str = ""
-        >>>     status: int = 0
+        With inheritance (3 levels detected automatically):
+        >>> @lvclass(library="Actor Framework", class_name="Message")
+        >>> class Message:
+        >>>     pass
+        >>>
+        >>> @lvclass(library="Serializable Message", class_name="Serializable Msg", 
+        ...          version=(1, 0, 0, 7))
+        >>> class SerializableMsg(Message):
+        >>>     pass
+        >>>
+        >>> @lvclass(library="Commander", class_name="echo general Msg")
+        >>> class EchoMsg(SerializableMsg):
+        >>>     message: str
+        >>>     code: int
         
         Then serialize:
-        >>> msg = EchoGeneralMsg()
-        >>> msg.message = "Hello, LabVIEW!"
+        >>> msg = EchoMsg()
+        >>> msg.message = "Hello World"
+        >>> msg.code = 0
         >>> from src.construct_impl.api import lvflatten
-        >>> data = lvflatten(msg)  # Automatically serializes to LVObject format
+        >>> data = lvflatten(msg)  # Auto-serializes with 3 levels
     """
     def decorator(cls):
         # Store LabVIEW metadata on the class
-        cls.__lv_library__ = library if library else cls.__name__
+        cls.__lv_library__ = library if library else ""
         cls.__lv_class_name__ = class_name if class_name else cls.__name__
         cls.__lv_version__ = version
-        cls.__lv_num_levels__ = num_levels
         cls.__is_lv_class__ = True
         
         # Add a method to serialize the instance
@@ -77,58 +93,70 @@ def lvclass(library: str = "", class_name: Optional[str] = None,
             """
             Convert this Python instance to a LabVIEW Object dictionary.
             
+            Automatically detects inheritance chain and builds complete LVObject.
+            
             Returns:
                 Dictionary suitable for LVObject serialization
             """
-            # Get all instance attributes
-            cluster_data = []
-            
-            # Build cluster data from instance attributes
-            # For now, we'll serialize to bytes using basic types
             import io
-            stream = io.BytesIO()
             
-            # Get type hints if available
-            hints = get_type_hints(self.__class__) if hasattr(self.__class__, '__annotations__') else {}
+            # Walk up the inheritance chain to find all @lvclass decorated base classes
+            inheritance_chain = []
+            for base in inspect.getmro(self.__class__):
+                if hasattr(base, '__is_lv_class__') and base.__is_lv_class__:
+                    inheritance_chain.append(base)
             
-            # Serialize each attribute
-            for attr_name in dir(self):
-                if attr_name.startswith('_') or attr_name.startswith('__lv'):
-                    continue
-                if callable(getattr(self, attr_name)):
-                    continue
-                    
-                value = getattr(self, attr_name)
-                attr_type = hints.get(attr_name)
+            # Reverse to go from root to derived
+            inheritance_chain.reverse()
+            
+            num_levels = len(inheritance_chain)
+            
+            # Collect versions for all levels
+            versions = []
+            for level_class in inheritance_chain:
+                versions.append(level_class.__lv_version__)
+            
+            # Build cluster data for each level
+            cluster_data_list = []
+            for i, level_class in enumerate(inheritance_chain):
+                # Get type hints for this specific level
+                level_hints = level_class.__annotations__ if hasattr(level_class, '__annotations__') else {}
                 
-                # Serialize based on type
-                if isinstance(value, str):
-                    stream.write(LVString.build(value))
-                elif isinstance(value, bool):
-                    stream.write(LVBoolean.build(value))
-                elif isinstance(value, int):
-                    stream.write(LVI32.build(value))
-                elif isinstance(value, float):
-                    stream.write(LVDouble.build(value))
+                if not level_hints:
+                    # No fields at this level - empty cluster
+                    cluster_data_list.append(b'')
+                else:
+                    # Serialize fields defined at this level
+                    stream = io.BytesIO()
+                    for attr_name, attr_type in level_hints.items():
+                        if hasattr(self, attr_name):
+                            value = getattr(self, attr_name)
+                            
+                            # Serialize based on type hint
+                            # Check for Construct types FIRST (they have .build method)
+                            if hasattr(attr_type, 'build'):
+                                # It's a Construct type (LVI32, LVU16, LVString, etc.)
+                                stream.write(attr_type.build(value))
+                            # Then check for Python types
+                            elif attr_type == str or isinstance(value, str):
+                                stream.write(LVString.build(value))
+                            elif attr_type == bool or isinstance(value, bool):
+                                stream.write(LVBoolean.build(value))
+                            elif attr_type == int or isinstance(value, int):
+                                stream.write(LVI32.build(value))
+                            elif attr_type == float or isinstance(value, float):
+                                stream.write(LVDouble.build(value))
+                    
+                    cluster_data_list.append(stream.getvalue())
             
-            cluster_bytes = stream.getvalue()
-            
-            # Create appropriate number of cluster data entries
-            # For derived class (level N), put data there. Parents get empty data.
-            EMPTY_CLUSTER_SIZE = 8  # LabVIEW standard for empty cluster padding
-            cluster_data_list = [b'\x00' * EMPTY_CLUSTER_SIZE] * (self.__lv_num_levels__ - 1) + [cluster_bytes]
-            
-            # Create versions list (all levels get same version for now)
-            version_int = (self.__lv_version__[0] << 24 | 
-                          self.__lv_version__[1] << 16 | 
-                          self.__lv_version__[2] << 8 | 
-                          self.__lv_version__[3])
-            versions = [version_int] * self.__lv_num_levels__
+            # Use only the most derived class name
+            most_derived = inheritance_chain[-1]
+            full_class_name = f"{most_derived.__lv_library__}.lvlib:{most_derived.__lv_class_name__}.lvclass" if most_derived.__lv_library__ else f"{most_derived.__lv_class_name__}.lvclass"
             
             # Create LVObject using the new API
             return create_lvobject(
-                class_name=f"{self.__lv_library__}.lvlib:{self.__lv_class_name__}.lvclass",
-                num_levels=self.__lv_num_levels__,
+                class_name=full_class_name,
+                num_levels=num_levels,
                 versions=versions,
                 cluster_data=cluster_data_list
             )
