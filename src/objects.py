@@ -369,6 +369,91 @@ def LVObject(cluster_constructs: Optional[List[Construct]] = None) -> Construct:
 # Helper Functions
 # ============================================================================
 
+def serialize_type_hints(type_hints: dict, values: dict) -> bytes:
+    """
+    Serialize type hints and their values to cluster data.
+    
+    This function handles the actual serialization of type hints, moving
+    the responsibility from the decorator to Object.py.
+    
+    IMPORTANT: If ANY type hint has a declared value (exists in values dict),
+    then ALL type hints must be serialized with their values or default empty values.
+    
+    Args:
+        type_hints: Dictionary of {field_name: type_hint}
+        values: Dictionary of {field_name: actual_value}
+    
+    Returns:
+        Serialized cluster data as bytes
+    """
+    from .basic_types import (
+        LVI32, LVU32, LVI16, LVU16, LVI8, LVU8, LVI64, LVU64,
+        LVString, LVBoolean, LVDouble, LVSingle
+    )
+    import io
+    
+    if not type_hints:
+        return b''
+    
+    # Check if ANY value is declared (not using defaults)
+    has_any_value = any(field_name in values for field_name in type_hints.keys())
+    
+    if not has_any_value:
+        # No values declared - return empty cluster
+        return b''
+    
+    # If ANY value is declared, serialize ALL type hints with defaults for missing ones
+    stream = io.BytesIO()
+    
+    for attr_name, attr_type in type_hints.items():
+        # Get value or use default
+        if attr_name in values:
+            value = values[attr_name]
+        else:
+            # Use default empty value based on type
+            if hasattr(attr_type, 'build'):
+                # It's a Construct type - use appropriate default
+                if attr_type == LVString:
+                    value = ""
+                elif attr_type == LVBoolean:
+                    value = False
+                elif attr_type in (LVI32, LVU32, LVI16, LVU16, LVI8, LVU8, LVI64, LVU64):
+                    value = 0
+                elif attr_type in (LVDouble, LVSingle):
+                    value = 0.0
+                else:
+                    # Unknown Construct type - skip
+                    continue
+            elif attr_type == str:
+                value = ""
+            elif attr_type == bool:
+                value = False
+            elif attr_type == int:
+                value = 0
+            elif attr_type == float:
+                value = 0.0
+            else:
+                # Unknown type - skip
+                continue
+        
+        # Serialize based on type hint
+        # Check for Construct types FIRST (they have .build method)
+        if hasattr(attr_type, 'build'):
+            # It's a Construct type (LVI32, LVU16, LVString, etc.)
+            stream.write(attr_type.build(value))
+        # Then check for Python types
+        elif attr_type == str or isinstance(value, str):
+            stream.write(LVString.build(value))
+        elif attr_type == bool or isinstance(value, bool):
+            stream.write(LVBoolean.build(value))
+        elif attr_type == int or isinstance(value, int):
+            stream.write(LVI32.build(value))
+        elif attr_type == float or isinstance(value, float):
+            stream.write(LVDouble.build(value))
+    
+    return stream.getvalue()
+
+
 def create_empty_lvobject() -> dict:
     """
     Create an empty LabVIEW Object.
