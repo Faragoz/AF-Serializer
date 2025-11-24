@@ -39,6 +39,20 @@ LVObjectType: TypeAlias = Annotated[dict, "LabVIEW Object"]
 
 
 # ============================================================================
+# Declarative Construct Definitions
+# ============================================================================
+
+# Version struct for declarative version serialization
+# Format: major(I16) minor(I16) patch(I16) build(I16)
+VersionStruct = Struct(
+    "major" / Int16ub,
+    "minor" / Int16ub,
+    "patch" / Int16ub,
+    "build" / Int16ub,
+)
+
+
+# ============================================================================
 # Helper Functions
 # ============================================================================
 
@@ -167,15 +181,12 @@ class LVObjectAdapter(Adapter):
             stream.read(padding_needed)
         
         # Always read VersionList (8 bytes per level: 4 x I16)
+        # Use declarative VersionStruct for clean parsing
         versions = []
         for _ in range(num_levels):
-            # Version format: major(I16) minor(I16) patch(I16) build(I16)
-            major = Int16ub.parse_stream(stream)
-            minor = Int16ub.parse_stream(stream)
-            patch = Int16ub.parse_stream(stream)
-            build = Int16ub.parse_stream(stream)
-            # Store as tuple for easier handling
-            versions.append((major, minor, patch, build))
+            version_dict = VersionStruct.parse_stream(stream)
+            # Convert to tuple for consistency
+            versions.append((version_dict.major, version_dict.minor, version_dict.patch, version_dict.build))
         
         # Try to read ClusterData for each level
         # Format: size (I32) + data
@@ -295,14 +306,13 @@ class LVObjectAdapter(Adapter):
             versions = [(0, 0, 0, 0)] * num_levels
         
         # Always write VersionList when num_levels > 0
+        # Use declarative VersionStruct for clean serialization
         for version in versions:
             # Version as tuple (major, minor, patch, build)
             if not isinstance(version, tuple) or len(version) != 4:
                 raise ValueError(f"Version must be a 4-tuple (major, minor, patch, build), got {version}")
-            stream.write(Int16ub.build(version[0]))
-            stream.write(Int16ub.build(version[1]))
-            stream.write(Int16ub.build(version[2]))
-            stream.write(Int16ub.build(version[3]))
+            version_dict = {"major": version[0], "minor": version[1], "patch": version[2], "build": version[3]}
+            stream.write(VersionStruct.build(version_dict))
         
         # Write ClusterData ONLY if at least one cluster has data
         # When all clusters are empty, don't write any cluster data (not even size prefixes)

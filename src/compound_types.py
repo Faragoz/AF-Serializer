@@ -339,6 +339,8 @@ def LVCluster(*field_constructs: Construct) -> Construct:
     Clusters are heterogeneous collections with NO header.
     Data is concatenated directly in order.
     
+    Uses declarative Construct parsing with parse_stream for clean implementation.
+    
     Args:
         *field_constructs: Variable number of Construct definitions for fields
     
