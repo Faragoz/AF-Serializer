@@ -15,15 +15,13 @@ Supported Types:
 
 from typing import TypeAlias, Annotated
 from construct import (
-    Struct,
     Int8sb, Int8ub,
     Int16sb, Int16ub,
     Int32sb, Int32ub,
     Int64sb, Int64ub,
     Float32b, Float64b,
     Byte,
-    Bytes,
-    this,
+    PascalString,
     Adapter,
     ValidationError,
 )
@@ -121,36 +119,13 @@ LVBoolean = BooleanAdapter(Byte)
 # String Type (Pascal String with Int32ub Prefix)
 # ============================================================================
 
-class StringAdapter(Adapter):
-    """
-    Adapter for LabVIEW String type.
-    
-    LabVIEW strings are Pascal Strings with:
-    - Int32ub (4 bytes, big-endian) length prefix
-    - UTF-8 encoded string data
-    
-    Format: [length (I32)] + [UTF-8 bytes]
-    Example: "Hello" -> 00000005 48656C6C6F
-    """
-    
-    def _decode(self, obj: dict, context, path) -> str:
-        """Convert bytes to Python string."""
-        return obj["data"].decode("utf-8")
-    
-    def _encode(self, obj: str, context, path) -> dict:
-        """Convert Python string to bytes with length prefix."""
-        data = obj.encode("utf-8")
-        return {"length": len(data), "data": data}
+from construct import PascalString
 
-
-LVString = StringAdapter(
-    Struct(
-        "length" / Int32ub,
-        "data" / Bytes(this.length),
-    )
-)
+LVString = PascalString(Int32ub, "utf-8")
 """
 LabVIEW String: Pascal String with Int32ub length prefix + UTF-8 encoding.
+
+Uses Construct's built-in PascalString for clean, declarative definition.
 
 Format: [length (I32)] + [UTF-8 bytes]
 Example: "Hello" -> 00000005 48656C6C6F

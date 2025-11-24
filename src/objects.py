@@ -225,25 +225,13 @@ class LVObjectAdapter(Adapter):
         
         # Write VersionList (8 bytes per version: 4 x I16)
         for version in versions:
-            if isinstance(version, tuple) and len(version) == 4:
-                # Version as tuple (major, minor, patch, build)
-                stream.write(Int16ub.build(version[0]))
-                stream.write(Int16ub.build(version[1]))
-                stream.write(Int16ub.build(version[2]))
-                stream.write(Int16ub.build(version[3]))
-            else:
-                # TODO: Delete legacy support later
-                # Legacy format: single I32 value
-                # Convert to tuple format
-                v = version if isinstance(version, int) else 0
-                major = (v >> 24) & 0xFF
-                minor = (v >> 16) & 0xFF
-                patch = (v >> 8) & 0xFF
-                build = v & 0xFF
-                stream.write(Int16ub.build(major))
-                stream.write(Int16ub.build(minor))
-                stream.write(Int16ub.build(patch))
-                stream.write(Int16ub.build(build))
+            # Version as tuple (major, minor, patch, build)
+            if not isinstance(version, tuple) or len(version) != 4:
+                raise ValueError(f"Version must be a 4-tuple (major, minor, patch, build), got {version}")
+            stream.write(Int16ub.build(version[0]))
+            stream.write(Int16ub.build(version[1]))
+            stream.write(Int16ub.build(version[2]))
+            stream.write(Int16ub.build(version[3]))
         
         # Write ClusterData (with size prefix for each cluster)
         for i, data in enumerate(cluster_data):

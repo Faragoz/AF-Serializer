@@ -136,7 +136,7 @@ def main():
     obj_construct = LVObject()
     obj = create_lvobject(
         class_names=["Actor Framework.lvlib:Actor.lvclass"],
-        versions=[0x01000000],
+        versions=[(1, 0, 0, 0)],  # Use tuple format
         cluster_data=[b'\x00\x00\x00\x00\x00\x00\x00\x00']
     )
     serialized = obj_construct.build(obj)
@@ -175,7 +175,7 @@ def main():
             "Serializable Message.lvlib:Serializable Msg.lvclass",
             "Commander.lvlib:echo general Msg.lvclass"
         ],
-        versions=[0x01000000, 0x01000007, 0x01000000],
+        versions=[(1, 0, 0, 0), (1, 0, 0, 7), (1, 0, 0, 0)],  # Use tuple format
         cluster_data=[
             b'\x00\x00\x00\x00\x00\x00\x00\x00',  # Empty for level 1
             b'\x00\x00\x00\x00\x00\x00\x00\x00',  # Empty for level 2

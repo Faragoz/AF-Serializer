@@ -14,14 +14,11 @@ Supported Types:
 
 from typing import TypeAlias, Annotated, List, Any, Sequence
 from construct import (
-    Struct,
     Int32ub,
-    Array as ConstructArray,
     Construct,
     Adapter,
-    Bytes,
     GreedyBytes,
-    this,
+    PrefixedArray,
 )
 
 
@@ -38,9 +35,13 @@ LVClusterType: TypeAlias = Annotated[tuple, "LabVIEW Cluster"]
 # Array 1D Implementation
 # ============================================================================
 
-class Array1DAdapter(Adapter):
+from construct import PrefixedArray
+
+def LVArray1D(element_construct: Construct) -> Construct:
     """
-    Adapter for LabVIEW 1D Array type.
+    Create a LabVIEW 1D Array construct.
+    
+    Uses Construct's built-in PrefixedArray for clean, declarative definition.
     
     LabVIEW 1D arrays are encoded as:
     - Int32ub (4 bytes, big-endian) number of elements
@@ -49,35 +50,6 @@ class Array1DAdapter(Adapter):
     Format: [num_elements (I32)] + [elements...]
     Example (3 elements: 1, 2, 3):
         0000 0003 0000 0001 0000 0002 0000 0003
-    """
-    
-    def __init__(self, element_construct: Construct):
-        """
-        Initialize Array1D adapter with element type.
-        
-        Args:
-            element_construct: Construct definition for array elements
-        """
-        self.element_construct = element_construct
-        super().__init__(
-            Struct(
-                "count" / Int32ub,
-                "elements" / ConstructArray(this.count, element_construct),
-            )
-        )
-    
-    def _decode(self, obj: dict, context, path) -> list:
-        """Convert parsed structure to Python list."""
-        return list(obj["elements"])
-    
-    def _encode(self, obj: list, context, path) -> dict:
-        """Convert Python list to structure for serialization."""
-        return {"count": len(obj), "elements": obj}
-
-
-def LVArray1D(element_construct: Construct) -> Construct:
-    """
-    Create a LabVIEW 1D Array construct.
     
     Args:
         element_construct: Construct definition for array elements (e.g., LVI32)
@@ -86,13 +58,13 @@ def LVArray1D(element_construct: Construct) -> Construct:
         Construct that can serialize/deserialize 1D arrays
     
     Example:
-        >>> from src.construct_impl import LVI32
+        >>> from src import LVI32, LVArray1D
         >>> array_construct = LVArray1D(LVI32)
         >>> data = array_construct.build([1, 2, 3])
         >>> print(data.hex())
         0000000300000001000000020000000003
     """
-    return Array1DAdapter(element_construct)
+    return PrefixedArray(Int32ub, element_construct)
 
 
 # ============================================================================
