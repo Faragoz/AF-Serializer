@@ -28,6 +28,7 @@ from construct import (
 
 LVArray1DType: TypeAlias = Annotated[List[Any], "LabVIEW 1D Array"]
 LVArray2DType: TypeAlias = Annotated[List[List[Any]], "LabVIEW 2D Array"]
+LVArrayType: TypeAlias = Annotated[List[Any] | List[List[Any]], "LabVIEW Array (auto-detects 1D or 2D)"]
 LVClusterType: TypeAlias = Annotated[tuple, "LabVIEW Cluster"]
 
 
@@ -192,6 +193,146 @@ def LVArray2D(element_construct: Construct) -> Construct:
         00000002000000020000000300000001...
     """
     return Array2DAdapter(element_construct)
+
+
+# ============================================================================
+# Unified Array Implementation (Auto-detects dimensions)
+# ============================================================================
+
+class UnifiedArrayAdapter(Adapter):
+    """
+    Unified adapter for LabVIEW Arrays that auto-detects dimensions.
+    
+    Automatically determines if data is 1D or 2D and serializes accordingly:
+    - 1D: [count (I32)] + [elements...]
+    - 2D: [num_dims (I32)] [dim1] [dim2] + [elements...]
+    """
+    
+    def __init__(self, element_construct: Construct):
+        self.element_construct = element_construct
+        super().__init__(GreedyBytes)
+    
+    def _decode(self, obj: bytes, context, path):
+        """Auto-detect dimension format and decode."""
+        import io
+        stream = io.BytesIO(obj)
+        
+        # Read first I32
+        first_int = Int32ub.parse_stream(stream)
+        
+        # Peek at next 4 bytes to determine if 1D or 2D
+        next_pos = stream.tell()
+        try:
+            second_int = Int32ub.parse_stream(stream)
+            stream.seek(next_pos)  # Reset position
+            
+            # Heuristic: if first_int is 2 and second_int looks like a reasonable dimension,
+            # it's likely 2D. Otherwise, treat as 1D.
+            if first_int == 2 and 0 < second_int < 10000:
+                # Likely 2D with 2 dimensions
+                return self._decode_2d(obj)
+            else:
+                # Treat as 1D
+                return self._decode_1d(obj)
+        except:
+            # If we can't read more, treat as 1D
+            return self._decode_1d(obj)
+    
+    def _decode_1d(self, obj: bytes):
+        """Decode as 1D array."""
+        import io
+        stream = io.BytesIO(obj)
+        count = Int32ub.parse_stream(stream)
+        elements = []
+        for _ in range(count):
+            element_bytes = stream.read(self.element_construct.sizeof())
+            elements.append(self.element_construct.parse(element_bytes))
+        return elements
+    
+    def _decode_2d(self, obj: bytes):
+        """Decode as 2D array."""
+        import io
+        stream = io.BytesIO(obj)
+        
+        num_dims = Int32ub.parse_stream(stream)
+        dimensions = []
+        for _ in range(num_dims):
+            dimensions.append(Int32ub.parse_stream(stream))
+        
+        total_elements = 1
+        for dim in dimensions:
+            total_elements *= dim
+        
+        elements = []
+        for _ in range(total_elements):
+            element_bytes = stream.read(self.element_construct.sizeof())
+            elements.append(self.element_construct.parse(element_bytes))
+        
+        if num_dims == 2:
+            result = []
+            idx = 0
+            for _ in range(dimensions[0]):
+                row = []
+                for _ in range(dimensions[1]):
+                    row.append(elements[idx])
+                    idx += 1
+                result.append(row)
+            return result
+        else:
+            return elements
+    
+    def _encode(self, obj, context, path) -> bytes:
+        """Auto-detect dimensions and encode."""
+        import io
+        stream = io.BytesIO()
+        
+        # Check if 1D or 2D
+        if isinstance(obj[0], list):
+            # 2D array
+            num_dims = 2
+            dim1 = len(obj)
+            dim2 = len(obj[0]) if obj else 0
+            
+            stream.write(Int32ub.build(num_dims))
+            stream.write(Int32ub.build(dim1))
+            stream.write(Int32ub.build(dim2))
+            
+            for row in obj:
+                for element in row:
+                    stream.write(self.element_construct.build(element))
+        else:
+            # 1D array
+            count = len(obj)
+            stream.write(Int32ub.build(count))
+            for element in obj:
+                stream.write(self.element_construct.build(element))
+        
+        return stream.getvalue()
+
+
+def LVArray(element_construct: Construct) -> Construct:
+    """
+    Create a unified LabVIEW Array construct that auto-detects dimensions.
+    
+    Automatically handles both 1D and 2D arrays:
+    - For 1D lists: [count] + [elements...]
+    - For 2D lists (list of lists): [num_dims] [dim1] [dim2] + [elements...]
+    
+    Args:
+        element_construct: Construct definition for array elements
+    
+    Returns:
+        Construct that can serialize/deserialize arrays
+    
+    Example:
+        >>> from src import LVI32, LVArray
+        >>> array_construct = LVArray(LVI32)
+        >>> # 1D array
+        >>> data = array_construct.build([1, 2, 3])
+        >>> # 2D array
+        >>> data = array_construct.build([[1, 2], [3, 4]])
+    """
+    return UnifiedArrayAdapter(element_construct)
 
 
 # ============================================================================
