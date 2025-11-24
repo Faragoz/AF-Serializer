@@ -289,9 +289,12 @@ class LVObjectAdapter(Adapter):
             cluster_bytes_list.append(cluster_bytes)
         
         all_clusters_empty = all(len(cb) == 0 for cb in cluster_bytes_list)
+
+        # If all clusters are empty, VersionList is written as default 0.0.0.0)
+        if all_clusters_empty:
+            versions = [(0, 0, 0, 0)]
         
         # Always write VersionList when num_levels > 0
-        # (Even when all clusters are empty, VersionList is written as default 0.0.0.0)
         for version in versions:
             # Version as tuple (major, minor, patch, build)
             if not isinstance(version, tuple) or len(version) != 4:

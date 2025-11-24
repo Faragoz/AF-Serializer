@@ -18,13 +18,13 @@ class EchoMsg(SerializableMsg):
     message: str      # → LVString
     code: LVU16      # → U16 (2 bytes)
 
-msg = EchoMsg()
+"""msg = EchoMsg()
 msg.message = "Hello World :)"
 msg.code = 1
 data = lvflatten(msg)
 
 print(msg)
-print(data.hex())
+print(data.hex())"""
 
 @lvclass(version=(1,0,0,2))
 class Test:
@@ -34,8 +34,8 @@ class Test:
     u8_array: LVArray1D(LVU8)
 
 test = Test()
-"""test.int32 = 123
-test.dbl = 3.14
+test.int32 = 123
+"""test.dbl = 3.14
 test.string = "Test String"
 test.u8_array = [1, 2, 3, 4, 5]"""
 

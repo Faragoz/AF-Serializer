@@ -26,7 +26,6 @@ from construct import (
     ValidationError,
 )
 
-
 # ============================================================================
 # Type Aliases for Type Hints
 # ============================================================================
@@ -118,8 +117,6 @@ LVBoolean = BooleanAdapter(Byte)
 # ============================================================================
 # String Type (Pascal String with Int32ub Prefix)
 # ============================================================================
-
-from construct import PascalString
 
 LVString = PascalString(Int32ub, "utf-8")
 """
