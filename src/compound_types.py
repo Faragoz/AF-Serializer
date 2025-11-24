@@ -185,7 +185,7 @@ def LVArray2D(element_construct: Construct) -> Construct:
         Construct that can serialize/deserialize 2D arrays
     
     Example:
-        >>> from src.construct_impl import LVI32
+        >>> from src import LVI32, LVArray2D
         >>> array_construct = LVArray2D(LVI32)
         >>> data = array_construct.build([[1, 2, 3], [4, 5, 6]])
         >>> print(data.hex())
@@ -277,7 +277,7 @@ def LVCluster(*field_constructs: Construct) -> Construct:
         Construct that can serialize/deserialize clusters
     
     Example:
-        >>> from src.construct_impl import LVString, LVI32
+        >>> from src import LVString, LVI32, LVCluster
         >>> cluster = LVCluster(LVString, LVI32)
         >>> data = cluster.build(("Hello, LabVIEW!", 0))
         >>> print(data.hex())
