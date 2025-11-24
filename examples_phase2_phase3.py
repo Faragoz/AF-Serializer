@@ -5,7 +5,7 @@ Examples demonstrating Phase 2 and Phase 3 of Construct-based LabVIEW serializat
 This script shows how to use compound types (Arrays, Clusters) and Objects.
 """
 
-from src.construct_impl import (
+from src import (
     LVI32, LVU16, LVString,
     LVArray1D, LVArray2D, LVCluster,
     LVObject, create_empty_lvobject, create_lvobject,

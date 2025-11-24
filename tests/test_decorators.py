@@ -27,7 +27,6 @@ def test_lvclass_decorator_sets_attributes():
     assert TestClass.__lv_library__ == "TestLib"
     assert TestClass.__lv_class_name__ == "TestClass"
     assert TestClass.__lv_version__ == (1, 2, 3, 4)
-    assert TestClass.__lv_num_levels__ == 1
     assert TestClass.__is_lv_class__ is True
 
 
@@ -37,10 +36,9 @@ def test_lvclass_decorator_defaults():
     class MyClass:
         pass
     
-    assert MyClass.__lv_library__ == "MyClass"
-    assert MyClass.__lv_class_name__ == "MyClass"
+    assert MyClass.__lv_library__ == ""  # Default is empty string, not class name
+    assert MyClass.__lv_class_name__ == "MyClass"  # Class name defaults to Python class name
     assert MyClass.__lv_version__ == (1, 0, 0, 0)
-    assert MyClass.__lv_num_levels__ == 1
 
 
 def test_lvclass_creates_to_lvobject_method():
@@ -79,9 +77,17 @@ def test_lvclass_creates_to_bytes_method():
 
 def test_lvclass_with_multi_level_inheritance():
     """Test @lvclass with multiple inheritance levels."""
-    @lvclass(library="Commander", class_name="echo general Msg", 
-             version=(1, 0, 0, 7), num_levels=3)
-    class EchoGeneralMsg:
+    # Create a proper inheritance chain
+    @lvclass(library="Actor Framework", class_name="Message")
+    class Message:
+        pass
+    
+    @lvclass(library="Serializable Message", class_name="Serializable Msg", version=(1, 0, 0, 7))
+    class SerializableMsg(Message):
+        pass
+    
+    @lvclass(library="Commander", class_name="echo general Msg")
+    class EchoGeneralMsg(SerializableMsg):
         def __init__(self):
             self.message = "Hello World"
             self.status = 0
@@ -89,6 +95,7 @@ def test_lvclass_with_multi_level_inheritance():
     obj = EchoGeneralMsg()
     lvobj_dict = obj.to_lvobject()
     
+    # Auto-detected 3 levels from inheritance chain
     assert lvobj_dict["num_levels"] == 3
     assert "Commander.lvlib:echo general Msg.lvclass" in lvobj_dict["class_name"]
     assert len(lvobj_dict["versions"]) == 3
@@ -197,7 +204,7 @@ def test_lvclass_empty_object():
 
 def test_lvflatten_integration():
     """Test that lvflatten automatically handles @lvclass objects."""
-    @lvclass(library="Commander", class_name="echo general Msg", num_levels=3)
+    @lvclass(library="Commander", class_name="echo general Msg")
     class EchoMsg:
         def __init__(self):
             self.message = "Hello, LabVIEW!"
@@ -209,5 +216,5 @@ def test_lvflatten_integration():
     data = lvflatten(msg)
     
     assert isinstance(data, bytes)
-    # Verify it's a proper LVObject
-    assert data[:4].hex() == "00000003"  # NumLevels = 3
+    # Verify it's a proper LVObject (single level = 1)
+    assert data[:4].hex() == "00000001"  # NumLevels = 1
