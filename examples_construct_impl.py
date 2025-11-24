@@ -5,7 +5,7 @@ Examples demonstrating the Construct-based LabVIEW serialization implementation.
 This script shows how to use the new construct_impl module for basic types.
 """
 
-from src.construct_impl import (
+from src import (
     lvflatten, lvunflatten,
     LVI32, LVU32, LVI16, LVI64,
     LVDouble, LVSingle,

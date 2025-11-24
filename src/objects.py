@@ -39,6 +39,24 @@ LVObjectType: TypeAlias = Annotated[dict, "LabVIEW Object"]
 
 
 # ============================================================================
+# Helper Functions
+# ============================================================================
+
+def _calculate_padding(bytes_count: int, alignment: int = 4) -> int:
+    """
+    Calculate padding bytes needed to align to specified boundary.
+    
+    Args:
+        bytes_count: Number of bytes already written/read
+        alignment: Alignment boundary (default: 4 bytes for LabVIEW)
+    
+    Returns:
+        Number of padding bytes needed
+    """
+    return (alignment - (bytes_count % alignment)) % alignment
+
+
+# ============================================================================
 # LVObject Implementation
 # ============================================================================
 
@@ -105,30 +123,50 @@ class LVObjectAdapter(Adapter):
             }
         
         # Read ClassName section (ONLY the most derived class)
+        # Format: total_length + Pascal strings + end marker (0x00)
         total_length = Int8ub.parse(stream.read(1))
         
-        # Read library name (Pascal string)
-        lib_length = Int8ub.parse(stream.read(1))
-        library = stream.read(lib_length).decode('utf-8')
+        # Read Pascal strings until we hit end marker (length = 0)
+        pascal_strings = []
+        bytes_read_in_section = 0
         
-        # Read class name (Pascal string)
-        class_length = Int8ub.parse(stream.read(1))
-        classname = stream.read(class_length).decode('utf-8')
+        while True:
+            str_length = Int8ub.parse(stream.read(1))
+            bytes_read_in_section += 1
+            
+            if str_length == 0:
+                # End marker found
+                break
+            
+            str_data = stream.read(str_length).decode('utf-8')
+            bytes_read_in_section += str_length
+            pascal_strings.append(str_data)
         
-        # Store only the most derived class name (library is not mandatory)
+        # Determine library and classname based on number of strings
+        if len(pascal_strings) == 1:
+            # No library, just class name
+            library = ""
+            classname = pascal_strings[0]
+        elif len(pascal_strings) >= 2:
+            # Library + classname (and possibly more, but we only care about first 2)
+            library = pascal_strings[0]
+            classname = pascal_strings[1]
+        else:
+            # No strings found - error case
+            library = ""
+            classname = ""
+        
+        # Store only the most derived class name
         class_name = classname if not library else f"{library}:{classname}"
         
-        # Read end marker
-        end_marker = stream.read(1)
-        
         # Read padding to align to 4-byte boundary
-        # Calculate bytes: 1 (total_length) + actual string bytes + 1 (end marker)
-        bytes_read = 1 + lib_length + 1 + class_length + 1 + 1
-        padding_needed = (4 - (bytes_read % 4)) % 4
+        # bytes_read = 1 (total_length byte) + bytes_read_in_section (strings + end marker)
+        bytes_read = 1 + bytes_read_in_section
+        padding_needed = _calculate_padding(bytes_read)
         if padding_needed > 0:
             stream.read(padding_needed)
         
-        # Read VersionList (8 bytes per level: 4 x I16 - for ALL levels including parents)
+        # Always read VersionList (8 bytes per level: 4 x I16)
         versions = []
         for _ in range(num_levels):
             # Version format: major(I16) minor(I16) patch(I16) build(I16)
@@ -139,24 +177,33 @@ class LVObjectAdapter(Adapter):
             # Store as tuple for easier handling
             versions.append((major, minor, patch, build))
         
-        # Read ClusterData for each level (ALL levels including parents)
+        # Try to read ClusterData for each level
         # Format: size (I32) + data
+        # If there are no more bytes (all clusters empty), create empty cluster list
         cluster_data = []
         for i in range(num_levels):
-            # Read cluster size
-            size = Int32ub.parse_stream(stream)
-            
-            if size > 0:
-                # Read the actual cluster data
-                if i < len(self.cluster_constructs):
-                    # Use provided construct to parse
-                    data = self.cluster_constructs[i].parse(stream.read(size))
-                    cluster_data.append(data)
+            try:
+                # Try to read cluster size
+                size = Int32ub.parse_stream(stream)
+                
+                if size > 0:
+                    # Read the actual cluster data
+                    if i < len(self.cluster_constructs):
+                        # Use provided construct to parse
+                        data = self.cluster_constructs[i].parse(stream.read(size))
+                        cluster_data.append(data)
+                    else:
+                        # No construct, store raw bytes
+                        cluster_data.append(stream.read(size))
                 else:
-                    # No construct, store raw bytes
-                    cluster_data.append(stream.read(size))
-            else:
-                # Empty cluster
+                    # Empty cluster
+                    cluster_data.append(b'')
+            except Exception as e:
+                # No more data available - all remaining clusters are empty
+                # This happens when all clusters are empty (no cluster data section in stream)
+                # Note: Using broad Exception catch because Construct can raise various exceptions
+                # (StreamError, etc.) when stream runs out of data. KeyboardInterrupt and
+                # SystemExit are BaseException subclasses, so they won't be caught here.
                 cluster_data.append(b'')
         
         return {
@@ -196,7 +243,12 @@ class LVObjectAdapter(Adapter):
             classname = class_name_data
         
         # Calculate total length for ClassName section (ONLY the most derived class)
-        total_length = 1 + len(library.encode('utf-8'))  # Length byte + library
+        # Format: [length bytes] + [strings] + [end marker]
+        # When library is present: lib_len + lib + class_len + class + 0x00
+        # When library is absent: class_len + class + 0x00
+        total_length = 0
+        if library:
+            total_length += 1 + len(library.encode('utf-8'))  # Length byte + library
         total_length += 1 + len(classname.encode('utf-8'))  # Length byte + class
         total_length += 1  # End marker
         
@@ -204,10 +256,11 @@ class LVObjectAdapter(Adapter):
         stream.write(Int8ub.build(total_length))
         
         # Write the most derived class name only
-        # Write library (Pascal string)
-        lib_bytes = library.encode('utf-8')
-        stream.write(Int8ub.build(len(lib_bytes)))
-        stream.write(lib_bytes)
+        # Write library (Pascal string) only if present
+        if library:
+            lib_bytes = library.encode('utf-8')
+            stream.write(Int8ub.build(len(lib_bytes)))
+            stream.write(lib_bytes)
         
         # Write class name (Pascal string)
         class_bytes = classname.encode('utf-8')
@@ -219,48 +272,44 @@ class LVObjectAdapter(Adapter):
         
         # Write padding to align to 4-byte boundary
         bytes_written = 1 + total_length
-        padding_needed = (4 - (bytes_written % 4)) % 4
+        padding_needed = _calculate_padding(bytes_written)
         if padding_needed > 0:
             stream.write(b'\x00' * padding_needed)
         
-        # Write VersionList (8 bytes per version: 4 x I16)
-        for version in versions:
-            if isinstance(version, tuple) and len(version) == 4:
-                # Version as tuple (major, minor, patch, build)
-                stream.write(Int16ub.build(version[0]))
-                stream.write(Int16ub.build(version[1]))
-                stream.write(Int16ub.build(version[2]))
-                stream.write(Int16ub.build(version[3]))
-            else:
-                # TODO: Delete legacy support later
-                # Legacy format: single I32 value
-                # Convert to tuple format
-                v = version if isinstance(version, int) else 0
-                major = (v >> 24) & 0xFF
-                minor = (v >> 16) & 0xFF
-                patch = (v >> 8) & 0xFF
-                build = v & 0xFF
-                stream.write(Int16ub.build(major))
-                stream.write(Int16ub.build(minor))
-                stream.write(Int16ub.build(patch))
-                stream.write(Int16ub.build(build))
-        
-        # Write ClusterData (with size prefix for each cluster)
+        # Check if all clusters are empty
+        # First, convert cluster_data to bytes to check sizes
+        cluster_bytes_list = []
         for i, data in enumerate(cluster_data):
-            # Serialize cluster data to bytes first
             if i < len(self.cluster_constructs):
                 cluster_bytes = self.cluster_constructs[i].build(data)
             elif isinstance(data, bytes):
                 cluster_bytes = data
             else:
-                # Empty cluster
                 cluster_bytes = b''
-            
-            # Write size prefix
-            stream.write(Int32ub.build(len(cluster_bytes)))
-            # Write data
-            if len(cluster_bytes) > 0:
-                stream.write(cluster_bytes)
+            cluster_bytes_list.append(cluster_bytes)
+        
+        all_clusters_empty = all(len(cb) == 0 for cb in cluster_bytes_list)
+        
+        # Always write VersionList when num_levels > 0
+        # (Even when all clusters are empty, VersionList is written as default 0.0.0.0)
+        for version in versions:
+            # Version as tuple (major, minor, patch, build)
+            if not isinstance(version, tuple) or len(version) != 4:
+                raise ValueError(f"Version must be a 4-tuple (major, minor, patch, build), got {version}")
+            stream.write(Int16ub.build(version[0]))
+            stream.write(Int16ub.build(version[1]))
+            stream.write(Int16ub.build(version[2]))
+            stream.write(Int16ub.build(version[3]))
+        
+        # Write ClusterData ONLY if at least one cluster has data
+        # When all clusters are empty, don't write any cluster data (not even size prefixes)
+        if not all_clusters_empty:
+            for cluster_bytes in cluster_bytes_list:
+                # Write size prefix
+                stream.write(Int32ub.build(len(cluster_bytes)))
+                # Write data
+                if len(cluster_bytes) > 0:
+                    stream.write(cluster_bytes)
         
         return stream.getvalue()
 
@@ -295,7 +344,7 @@ def LVObject(cluster_constructs: Optional[List[Construct]] = None) -> Construct:
         >>> data = obj_construct.build({
         ...     "num_levels": 1,
         ...     "class_name": "Actor Framework.lvlib:Actor.lvclass",
-        ...     "versions": [0x01000000],
+        ...     "versions": [(1, 0, 0, 0)],
         ...     "cluster_data": [b'']
         ... })
     
@@ -306,7 +355,7 @@ def LVObject(cluster_constructs: Optional[List[Construct]] = None) -> Construct:
         >>> data = obj_construct.build({
         ...     "num_levels": 3,
         ...     "class_name": "Commander.lvlib:echo general Msg.lvclass",
-        ...     "versions": [0x01000000, 0x01000007, 0x01000000],
+        ...     "versions": [(1, 0, 0, 0), (1, 0, 0, 7), (1, 0, 0, 0)],
         ...     "cluster_data": [b'', b'', ...]
         ... })
     """
@@ -362,7 +411,7 @@ def create_lvobject(class_name_or_names = None,
         >>> obj = create_lvobject(
         ...     class_name="Actor Framework.lvlib:Actor.lvclass",
         ...     num_levels=1,
-        ...     versions=[0x01000000],
+        ...     versions=[(1, 0, 0, 0)],
         ...     cluster_data=[b'']
         ... )
     
@@ -370,14 +419,14 @@ def create_lvobject(class_name_or_names = None,
         >>> obj = create_lvobject(
         ...     class_name="Commander.lvlib:echo general Msg.lvclass",  # Only most derived
         ...     num_levels=3,  # But indicates 3 levels total
-        ...     versions=[0x01000000, 0x01000007, 0x01000000],  # 3 versions
+        ...     versions=[(1, 0, 0, 0), (1, 0, 0, 7), (1, 0, 0, 0)],  # 3 versions in tuple format
         ...     cluster_data=[b'', b'', cluster_bytes]  # 3 data sections
         ... )
     
-    Example (old API - backwards compatibility):
+    Example (old API - backwards compatibility using positional args):
         >>> obj = create_lvobject(
         ...     ["Level1.lvlib:Class1.lvclass", "Level2.lvlib:Class2.lvclass"],
-        ...     [0x01000000, 0x01000000],
+        ...     [(1, 0, 0, 0), (1, 0, 0, 0)],
         ...     [b'', b'']
         ... )
     """

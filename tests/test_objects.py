@@ -7,7 +7,7 @@ real HEX examples from LabVIEW documentation.
 
 import pytest
 
-from construct_impl import (
+from src import (
     LVObject, LVI32, LVU16, LVString, LVCluster,
     create_empty_lvobject, create_lvobject,
 )
@@ -68,7 +68,7 @@ def test_lvobject_actor_serialization():
     obj_construct = LVObject()
     data = create_lvobject(
         class_names=["Actor Framework.lvlib:Actor.lvclass"],
-        versions=[0x01000000],
+        versions=[(1, 0, 0, 0)],  # Use tuple format
         cluster_data=[b'\x00\x00\x00\x00\x00\x00\x00\x00']
     )
     
@@ -86,7 +86,7 @@ def test_lvobject_single_level_roundtrip():
     obj_construct = LVObject()
     original = create_lvobject(
         class_names=["MyLibrary.lvlib:MyClass.lvclass"],
-        versions=[0x01000000],
+        versions=[(1, 0, 0, 0)],  # Use tuple format
         cluster_data=[b'']
     )
     
@@ -142,7 +142,7 @@ def test_lvobject_three_level_inheritance():
             "Serializable Message.lvlib:Serializable Msg.lvclass",
             "Commander.lvlib:echo general Msg.lvclass"
         ],
-        versions=[0x01000000, 0x01000007, 0x01000000],
+        versions=[(1, 0, 0, 0), (1, 0, 0, 7), (1, 0, 0, 0)],  # Use tuple format
         cluster_data=[
             b'\x00\x00\x00\x00\x00\x00\x00\x00',  # Empty for level 1
             b'\x00\x00\x00\x00\x00\x00\x00\x00',  # Empty for level 2
@@ -175,7 +175,7 @@ def test_lvobject_three_level_class_names():
             "Serializable Message.lvlib:Serializable Msg.lvclass",
             "Commander.lvlib:echo general Msg.lvclass"
         ],
-        versions=[0x01000000, 0x01000007, 0x01000000],
+        versions=[(1, 0, 0, 0), (1, 0, 0, 7), (1, 0, 0, 0)],  # Use tuple format
         cluster_data=[b'', b'', b'']
     )
     
@@ -195,14 +195,14 @@ def test_lvobject_versions():
     obj_construct = LVObject()
     data = create_lvobject(
         class_names=["Test.lvlib:Test.lvclass"],
-        versions=[0x01020304],  # Version 1.2.3.4
+        versions=[(1, 2, 3, 4)],  # Version 1.2.3.4 in tuple format
         cluster_data=[b'']
     )
     
     serialized = obj_construct.build(data)
     deserialized = obj_construct.parse(serialized)
     
-    assert deserialized["versions"][0] == 0x01020304
+    assert deserialized["versions"][0] == (1, 2, 3, 4)
 
 
 # ============================================================================
@@ -223,7 +223,7 @@ def test_create_lvobject_helper():
     """Test create_lvobject helper function."""
     obj = create_lvobject(
         class_names=["Test.lvlib:Test.lvclass"],
-        versions=[0x01000000]
+        versions=[(1, 0, 0, 0)]  # Use tuple format
     )
     
     assert obj["num_levels"] == 1
@@ -237,7 +237,7 @@ def test_create_lvobject_with_data():
     cluster_data = [b'\x00\x00\x00\x00']
     obj = create_lvobject(
         class_names=["Test.lvlib:Test.lvclass"],
-        versions=[0x01000000],
+        versions=[(1, 0, 0, 0)],  # Use tuple format
         cluster_data=cluster_data
     )
     
@@ -258,7 +258,7 @@ def test_lvobject_with_complex_data():
     obj_construct = LVObject()
     obj = create_lvobject(
         class_names=["MyLib.lvlib:MyClass.lvclass"],
-        versions=[0x01000000],
+        versions=[(1, 0, 0, 0)],  # Use tuple format
         cluster_data=[cluster_bytes]
     )
     
@@ -276,7 +276,7 @@ def test_lvobject_multiple_versions():
             "Base.lvlib:Base.lvclass",
             "Derived.lvlib:Derived.lvclass"
         ],
-        versions=[0x01000000, 0x02000005],  # Different versions
+        versions=[(1, 0, 0, 0), (2, 0, 0, 5)],  # Different versions in tuple format
         cluster_data=[b'', b'']
     )
     
@@ -284,8 +284,8 @@ def test_lvobject_multiple_versions():
     deserialized = obj_construct.parse(serialized)
     
     assert deserialized["num_levels"] == 2
-    assert deserialized["versions"][0] == 0x01000000
-    assert deserialized["versions"][1] == 0x02000005
+    assert deserialized["versions"][0] == (1, 0, 0, 0)
+    assert deserialized["versions"][1] == (2, 0, 0, 5)
 
 
 @pytest.mark.parametrize("num_levels", [1, 2, 3, 4, 5])
@@ -297,7 +297,7 @@ def test_lvobject_various_inheritance_depths(num_levels):
     but NumLevels, versions, and cluster_data all have entries for ALL levels.
     """
     class_names = [f"Level{i}.lvlib:Class{i}.lvclass" for i in range(num_levels)]
-    versions = [0x01000000] * num_levels
+    versions = [(1, 0, 0, 0)] * num_levels  # Use tuple format
     cluster_data = [b''] * num_levels
     
     obj_construct = LVObject()

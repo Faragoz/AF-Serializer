@@ -9,7 +9,7 @@ import math
 import pytest
 from construct import ValidationError, ConstructError
 
-from construct_impl import (
+from src import (
     lvflatten, lvunflatten,
     LVI32, LVU32, LVI16, LVU16, LVI8, LVU8, LVI64, LVU64,
     LVDouble, LVSingle, LVBoolean, LVString,
@@ -540,7 +540,7 @@ def test_multiple_types_serialization():
 
 def test_convenience_functions():
     """Test convenience functions for common types."""
-    from construct_impl import (
+    from src import (
         flatten_i32, unflatten_i32,
         flatten_double, unflatten_double,
         flatten_string, unflatten_string,

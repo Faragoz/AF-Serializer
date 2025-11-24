@@ -5,7 +5,7 @@ Examples demonstrating Phase 2 and Phase 3 of Construct-based LabVIEW serializat
 This script shows how to use compound types (Arrays, Clusters) and Objects.
 """
 
-from src.construct_impl import (
+from src import (
     LVI32, LVU16, LVString,
     LVArray1D, LVArray2D, LVCluster,
     LVObject, create_empty_lvobject, create_lvobject,
@@ -136,13 +136,13 @@ def main():
     obj_construct = LVObject()
     obj = create_lvobject(
         class_names=["Actor Framework.lvlib:Actor.lvclass"],
-        versions=[0x01000000],
+        versions=[(1, 0, 0, 0)],  # Use tuple format
         cluster_data=[b'\x00\x00\x00\x00\x00\x00\x00\x00']
     )
     serialized = obj_construct.build(obj)
     print(f"Actor Object (single level):")
     print(f"  Class: {obj['class_names'][0]}")
-    print(f"  Version: {obj['versions'][0]:#010x}")
+    print(f"  Version: {obj['versions'][0]} (1.0.0.0)")
     print(f"  HEX (first 40 bytes): {serialized[:40].hex()}...")
     print(f"  NumLevels: {serialized[:4].hex()} (1 level)")
     
@@ -175,7 +175,7 @@ def main():
             "Serializable Message.lvlib:Serializable Msg.lvclass",
             "Commander.lvlib:echo general Msg.lvclass"
         ],
-        versions=[0x01000000, 0x01000007, 0x01000000],
+        versions=[(1, 0, 0, 0), (1, 0, 0, 7), (1, 0, 0, 0)],  # Use tuple format
         cluster_data=[
             b'\x00\x00\x00\x00\x00\x00\x00\x00',  # Empty for level 1
             b'\x00\x00\x00\x00\x00\x00\x00\x00',  # Empty for level 2
@@ -190,9 +190,9 @@ def main():
     print(f"  HEX (first 60 bytes): {serialized[:60].hex()}...")
     
     print(f"\n  Versions:")
-    print(f"    Level 1: {obj['versions'][0]:#010x} (1.0.0.0)")
-    print(f"    Level 2: {obj['versions'][1]:#010x} (1.0.0.7)")
-    print(f"    Level 3: {obj['versions'][2]:#010x} (1.0.0.0)")
+    print(f"    Level 1: {obj['versions'][0]} (1.0.0.0)")
+    print(f"    Level 2: {obj['versions'][1]} (1.0.0.7)")
+    print(f"    Level 3: {obj['versions'][2]} (1.0.0.0)")
     
     deserialized = obj_construct.parse(serialized)
     print(f"\n  Deserialized:")

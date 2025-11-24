@@ -59,13 +59,17 @@ def main():
     
     print("Example: Message → Serializable Msg → echo general Msg")
     
-    @lvclass(
-        library="Commander",
-        class_name="echo general Msg",
-        version=(1, 0, 0, 7),
-        num_levels=3  # Indicates 3 levels of inheritance
-    )
-    class EchoGeneralMsg:
+    # Create proper inheritance chain for 3 levels
+    @lvclass(library="Actor Framework", class_name="Message")
+    class Message:
+        pass
+    
+    @lvclass(library="Serializable Message", class_name="Serializable Msg", version=(1, 0, 0, 7))
+    class SerializableMsg(Message):
+        pass
+    
+    @lvclass(library="Commander", class_name="echo general Msg")
+    class EchoGeneralMsg(SerializableMsg):
         def __init__(self):
             self.message = "Hello World"
             self.status = 0
@@ -130,8 +134,8 @@ def main():
     print(f"  Library: {CustomActor.__lv_library__}")
     print(f"  Class name: {CustomActor.__lv_class_name__}")
     print(f"  Version: {CustomActor.__lv_version__}")
-    print(f"  Num levels: {CustomActor.__lv_num_levels__}")
     print(f"  Is LV class: {CustomActor.__is_lv_class__}")
+    print(f"  Note: num_levels is calculated dynamically based on inheritance")
     
     # ========================================================================
     # to_lvobject() Method
