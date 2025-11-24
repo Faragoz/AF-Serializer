@@ -91,7 +91,10 @@ LVBoolean = Flag
 LabVIEW Boolean: 8-bit boolean (0x00 or 0x01).
 
 Uses Construct's built-in Flag for clean, declarative definition.
-Maps 0x00 to False and 0x01 to True.
+Maps 0x00 to False and any non-zero byte to True.
+
+Note: Flag is more permissive than strict validation - any non-zero byte
+is treated as True, not just 0x01. This is standard boolean behavior.
 """
 
 
