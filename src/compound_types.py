@@ -245,8 +245,8 @@ class UnifiedArrayAdapter(Adapter):
         count = Int32ub.parse_stream(stream)
         elements = []
         for _ in range(count):
-            element_bytes = stream.read(self.element_construct.sizeof())
-            elements.append(self.element_construct.parse(element_bytes))
+            # Use parse_stream to handle variable-length types
+            elements.append(self.element_construct.parse_stream(stream))
         return elements
     
     def _decode_2d(self, obj: bytes):
@@ -265,8 +265,8 @@ class UnifiedArrayAdapter(Adapter):
         
         elements = []
         for _ in range(total_elements):
-            element_bytes = stream.read(self.element_construct.sizeof())
-            elements.append(self.element_construct.parse(element_bytes))
+            # Use parse_stream to handle variable-length types
+            elements.append(self.element_construct.parse_stream(stream))
         
         if num_dims == 2:
             result = []
