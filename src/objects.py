@@ -198,8 +198,12 @@ class LVObjectAdapter(Adapter):
                 else:
                     # Empty cluster
                     cluster_data.append(b'')
-            except:
+            except Exception as e:
                 # No more data available - all remaining clusters are empty
+                # This happens when all clusters are empty (no cluster data section in stream)
+                # Note: Using broad Exception catch because Construct can raise various exceptions
+                # (StreamError, etc.) when stream runs out of data. KeyboardInterrupt and
+                # SystemExit are BaseException subclasses, so they won't be caught here.
                 cluster_data.append(b'')
         
         return {
