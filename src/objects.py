@@ -39,6 +39,24 @@ LVObjectType: TypeAlias = Annotated[dict, "LabVIEW Object"]
 
 
 # ============================================================================
+# Helper Functions
+# ============================================================================
+
+def _calculate_padding(bytes_count: int, alignment: int = 4) -> int:
+    """
+    Calculate padding bytes needed to align to specified boundary.
+    
+    Args:
+        bytes_count: Number of bytes already written/read
+        alignment: Alignment boundary (default: 4 bytes for LabVIEW)
+    
+    Returns:
+        Number of padding bytes needed
+    """
+    return (alignment - (bytes_count % alignment)) % alignment
+
+
+# ============================================================================
 # LVObject Implementation
 # ============================================================================
 
@@ -124,7 +142,7 @@ class LVObjectAdapter(Adapter):
         # Read padding to align to 4-byte boundary
         # Calculate bytes: 1 (total_length) + actual string bytes + 1 (end marker)
         bytes_read = 1 + lib_length + 1 + class_length + 1 + 1
-        padding_needed = (4 - (bytes_read % 4)) % 4
+        padding_needed = _calculate_padding(bytes_read)
         if padding_needed > 0:
             stream.read(padding_needed)
         
@@ -219,7 +237,7 @@ class LVObjectAdapter(Adapter):
         
         # Write padding to align to 4-byte boundary
         bytes_written = 1 + total_length
-        padding_needed = (4 - (bytes_written % 4)) % 4
+        padding_needed = _calculate_padding(bytes_written)
         if padding_needed > 0:
             stream.write(b'\x00' * padding_needed)
         
