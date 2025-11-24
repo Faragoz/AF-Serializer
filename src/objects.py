@@ -123,41 +123,87 @@ class LVObjectAdapter(Adapter):
             }
         
         # Read ClassName section (ONLY the most derived class)
+        # Format: total_length + Pascal strings + end marker (0x00)
         total_length = Int8ub.parse(stream.read(1))
         
-        # Read library name (Pascal string)
-        lib_length = Int8ub.parse(stream.read(1))
-        library = stream.read(lib_length).decode('utf-8')
+        # Read Pascal strings until we hit end marker (length = 0)
+        pascal_strings = []
+        bytes_read_in_section = 0
         
-        # Read class name (Pascal string)
-        class_length = Int8ub.parse(stream.read(1))
-        classname = stream.read(class_length).decode('utf-8')
+        while True:
+            str_length = Int8ub.parse(stream.read(1))
+            bytes_read_in_section += 1
+            
+            if str_length == 0:
+                # End marker found
+                break
+            
+            str_data = stream.read(str_length).decode('utf-8')
+            bytes_read_in_section += str_length
+            pascal_strings.append(str_data)
         
-        # Store only the most derived class name (library is not mandatory)
+        # Determine library and classname based on number of strings
+        if len(pascal_strings) == 1:
+            # No library, just class name
+            library = ""
+            classname = pascal_strings[0]
+        elif len(pascal_strings) >= 2:
+            # Library + classname (and possibly more, but we only care about first 2)
+            library = pascal_strings[0]
+            classname = pascal_strings[1]
+        else:
+            # No strings found - error case
+            library = ""
+            classname = ""
+        
+        # Store only the most derived class name
         class_name = classname if not library else f"{library}:{classname}"
         
-        # Read end marker
-        end_marker = stream.read(1)
-        
         # Read padding to align to 4-byte boundary
-        # Calculate bytes: 1 (total_length) + actual string bytes + 1 (end marker)
-        bytes_read = 1 + lib_length + 1 + class_length + 1 + 1
+        # bytes_read = 1 (total_length byte) + bytes_read_in_section (strings + end marker)
+        bytes_read = 1 + bytes_read_in_section
         padding_needed = _calculate_padding(bytes_read)
         if padding_needed > 0:
             stream.read(padding_needed)
         
-        # Read VersionList (8 bytes per level: 4 x I16 - for ALL levels including parents)
-        versions = []
-        for _ in range(num_levels):
-            # Version format: major(I16) minor(I16) patch(I16) build(I16)
-            major = Int16ub.parse_stream(stream)
-            minor = Int16ub.parse_stream(stream)
-            patch = Int16ub.parse_stream(stream)
-            build = Int16ub.parse_stream(stream)
-            # Store as tuple for easier handling
-            versions.append((major, minor, patch, build))
+        # Peek ahead to check if all clusters are empty
+        # Save current position
+        peek_pos = stream.tell()
         
-        # Read ClusterData for each level (ALL levels including parents)
+        # Read cluster sizes to check if all are empty
+        cluster_sizes = []
+        try:
+            for _ in range(num_levels):
+                size = Int32ub.parse_stream(stream)
+                cluster_sizes.append(size)
+        except:
+            # If we can't read sizes, assume we have VersionList
+            stream.seek(peek_pos)
+            cluster_sizes = None
+        
+        # Reset to saved position
+        stream.seek(peek_pos)
+        
+        # Determine if we should read VersionList
+        # VersionList is included ONLY if at least one cluster has data
+        all_clusters_empty = cluster_sizes is not None and all(s == 0 for s in cluster_sizes)
+        
+        versions = []
+        if not all_clusters_empty:
+            # Read VersionList (8 bytes per level: 4 x I16)
+            for _ in range(num_levels):
+                # Version format: major(I16) minor(I16) patch(I16) build(I16)
+                major = Int16ub.parse_stream(stream)
+                minor = Int16ub.parse_stream(stream)
+                patch = Int16ub.parse_stream(stream)
+                build = Int16ub.parse_stream(stream)
+                # Store as tuple for easier handling
+                versions.append((major, minor, patch, build))
+        else:
+            # All clusters empty - no VersionList, use default 0.0.0.0
+            versions = [(0, 0, 0, 0)] * num_levels
+        
+        # Read ClusterData for each level
         # Format: size (I32) + data
         cluster_data = []
         for i in range(num_levels):
@@ -214,7 +260,12 @@ class LVObjectAdapter(Adapter):
             classname = class_name_data
         
         # Calculate total length for ClassName section (ONLY the most derived class)
-        total_length = 1 + len(library.encode('utf-8'))  # Length byte + library
+        # Format: [length bytes] + [strings] + [end marker]
+        # When library is present: lib_len + lib + class_len + class + 0x00
+        # When library is absent: class_len + class + 0x00
+        total_length = 0
+        if library:
+            total_length += 1 + len(library.encode('utf-8'))  # Length byte + library
         total_length += 1 + len(classname.encode('utf-8'))  # Length byte + class
         total_length += 1  # End marker
         
@@ -222,10 +273,11 @@ class LVObjectAdapter(Adapter):
         stream.write(Int8ub.build(total_length))
         
         # Write the most derived class name only
-        # Write library (Pascal string)
-        lib_bytes = library.encode('utf-8')
-        stream.write(Int8ub.build(len(lib_bytes)))
-        stream.write(lib_bytes)
+        # Write library (Pascal string) only if present
+        if library:
+            lib_bytes = library.encode('utf-8')
+            stream.write(Int8ub.build(len(lib_bytes)))
+            stream.write(lib_bytes)
         
         # Write class name (Pascal string)
         class_bytes = classname.encode('utf-8')
@@ -241,27 +293,36 @@ class LVObjectAdapter(Adapter):
         if padding_needed > 0:
             stream.write(b'\x00' * padding_needed)
         
-        # Write VersionList (8 bytes per version: 4 x I16)
-        for version in versions:
-            # Version as tuple (major, minor, patch, build)
-            if not isinstance(version, tuple) or len(version) != 4:
-                raise ValueError(f"Version must be a 4-tuple (major, minor, patch, build), got {version}")
-            stream.write(Int16ub.build(version[0]))
-            stream.write(Int16ub.build(version[1]))
-            stream.write(Int16ub.build(version[2]))
-            stream.write(Int16ub.build(version[3]))
-        
-        # Write ClusterData (with size prefix for each cluster)
+        # Check if all clusters are empty
+        # First, convert cluster_data to bytes to check sizes
+        cluster_bytes_list = []
         for i, data in enumerate(cluster_data):
-            # Serialize cluster data to bytes first
             if i < len(self.cluster_constructs):
                 cluster_bytes = self.cluster_constructs[i].build(data)
             elif isinstance(data, bytes):
                 cluster_bytes = data
             else:
-                # Empty cluster
                 cluster_bytes = b''
-            
+            cluster_bytes_list.append(cluster_bytes)
+        
+        all_clusters_empty = all(len(cb) == 0 for cb in cluster_bytes_list)
+        all_versions_zero = all(v == (0, 0, 0, 0) for v in versions)
+        
+        # Write VersionList ONLY if at least one cluster has data
+        # OR if any version is non-zero
+        # (If all clusters are empty AND all versions are 0.0.0.0, skip VersionList per LabVIEW spec)
+        if not (all_clusters_empty and all_versions_zero):
+            for version in versions:
+                # Version as tuple (major, minor, patch, build)
+                if not isinstance(version, tuple) or len(version) != 4:
+                    raise ValueError(f"Version must be a 4-tuple (major, minor, patch, build), got {version}")
+                stream.write(Int16ub.build(version[0]))
+                stream.write(Int16ub.build(version[1]))
+                stream.write(Int16ub.build(version[2]))
+                stream.write(Int16ub.build(version[3]))
+        
+        # Write ClusterData (with size prefix for each cluster)
+        for cluster_bytes in cluster_bytes_list:
             # Write size prefix
             stream.write(Int32ub.build(len(cluster_bytes)))
             # Write data
