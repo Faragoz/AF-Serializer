@@ -133,40 +133,9 @@ Example: "Hello" -> 00000005 48656C6C6F
 
 
 # ============================================================================
-# TODO: Phase 2 - Compound Types
+# NOTE: Compound Types and Objects
 # ============================================================================
 
-# TODO: Implement LVArray1D
-# Format: [num_elements (I32)] + [elements...]
-# Example (3 elements: 1, 2, 3):
-#   0000 0003 0000 0001 0000 0002 0000 0003
-
-# TODO: Implement LVArray2D
-# Format: [num_dims (I32)] [dim1_size] [dim2_size] + [elements...]
-# Example (2×3 elements):
-#   0000 0002 0000 0003 0000 0001 0000 0002 0000 0003 0000 0001 0000 0002 0000 0003
-
-# TODO: Implement LVCluster
-# Format: Direct concatenation of elements WITHOUT header
-# IMPORTANT: NO header of element count, data concatenated directly
-# Example (String "Hello, LabVIEW!" + Enum 0):
-#   0000 0010 4865 6C6C 6F2C 204C 6162 5649 4557 2100 0000
-
-
-# ============================================================================
-# TODO: Phase 3 - LVObject Types
-# ============================================================================
-
-# TODO: Implement LVObject
-# Format:
-#   - NumLevels (I32): 0x00000000 for empty LabVIEW Object
-#   - ClassName: Total length (I8) + Pascal Strings + End marker (0x00) + Padding
-#   - VersionList: Version numbers for each contained object
-#   - ClusterData: State data for each contained object
-#
-# Example (Empty LVObject):
-#   0000 0000
-#
-# Example (Actor Object - empty):
-#   0000 0001 2515 4163 746F 7220 4672 616D 6577 6F72 6B2E 6C76 6C69 620D
-#   4163 746F 722E 6C76 636C 6173 7300 0000 0000 0000 0000 0000
+# Compound types (Arrays, Clusters) are implemented in compound_types.py
+# LVObject types are implemented in objects.py
+# These modules use the basic types defined above.

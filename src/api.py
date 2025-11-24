@@ -182,25 +182,25 @@ def unflatten_boolean(data: bytes) -> bool:
 
 
 # ============================================================================
-# TODO: Phase 2 - Array and Cluster API
+# NOTE: Advanced Serialization
 # ============================================================================
 
-# TODO: Implement lvflatten support for lists (arrays)
-# def flatten_array_1d(values: list, element_type: Construct) -> bytes:
-#     """Serialize a list to LabVIEW 1D Array format."""
-#     pass
-
-# TODO: Implement lvflatten support for tuples/dicts (clusters)
-# def flatten_cluster(values: tuple, field_types: list[Construct]) -> bytes:
-#     """Serialize a tuple to LabVIEW Cluster format."""
-#     pass
-
-
-# ============================================================================
-# TODO: Phase 3 - LVObject API
-# ============================================================================
-
-# TODO: Implement lvflatten support for LVObject instances
-# def flatten_lvobject(obj: LVObject) -> bytes:
-#     """Serialize a LabVIEW Object instance."""
-#     pass
+# For arrays: Use LVArray1D or LVArray2D from compound_types module
+# For clusters: Use LVCluster from compound_types module  
+# For objects: Use @lvclass decorator or LVObject from objects module
+#
+# Examples:
+#   from src import LVArray1D, LVI32
+#   array_construct = LVArray1D(LVI32)
+#   data = array_construct.build([1, 2, 3])
+#
+#   from src import LVCluster, LVString, LVI32
+#   cluster = LVCluster(LVString, LVI32)
+#   data = cluster.build(("Hello", 42))
+#
+#   from src import lvclass, lvflatten
+#   @lvclass(library="MyLib", class_name="MyClass")
+#   class MyClass:
+#       value: int = 0
+#   obj = MyClass()
+#   data = lvflatten(obj)  # Automatic serialization

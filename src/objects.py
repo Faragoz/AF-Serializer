@@ -283,7 +283,7 @@ def LVObject(cluster_constructs: Optional[List[Construct]] = None) -> Construct:
         >>> data = obj_construct.build({
         ...     "num_levels": 1,
         ...     "class_name": "Actor Framework.lvlib:Actor.lvclass",
-        ...     "versions": [0x01000000],
+        ...     "versions": [(1, 0, 0, 0)],
         ...     "cluster_data": [b'']
         ... })
     
@@ -294,7 +294,7 @@ def LVObject(cluster_constructs: Optional[List[Construct]] = None) -> Construct:
         >>> data = obj_construct.build({
         ...     "num_levels": 3,
         ...     "class_name": "Commander.lvlib:echo general Msg.lvclass",
-        ...     "versions": [0x01000000, 0x01000007, 0x01000000],
+        ...     "versions": [(1, 0, 0, 0), (1, 0, 0, 7), (1, 0, 0, 0)],
         ...     "cluster_data": [b'', b'', ...]
         ... })
     """
@@ -350,7 +350,7 @@ def create_lvobject(class_name_or_names = None,
         >>> obj = create_lvobject(
         ...     class_name="Actor Framework.lvlib:Actor.lvclass",
         ...     num_levels=1,
-        ...     versions=[0x01000000],
+        ...     versions=[(1, 0, 0, 0)],
         ...     cluster_data=[b'']
         ... )
     
@@ -358,14 +358,14 @@ def create_lvobject(class_name_or_names = None,
         >>> obj = create_lvobject(
         ...     class_name="Commander.lvlib:echo general Msg.lvclass",  # Only most derived
         ...     num_levels=3,  # But indicates 3 levels total
-        ...     versions=[0x01000000, 0x01000007, 0x01000000],  # 3 versions
+        ...     versions=[(1, 0, 0, 0), (1, 0, 0, 7), (1, 0, 0, 0)],  # 3 versions in tuple format
         ...     cluster_data=[b'', b'', cluster_bytes]  # 3 data sections
         ... )
     
-    Example (old API - backwards compatibility):
+    Example (old API - backwards compatibility using positional args):
         >>> obj = create_lvobject(
         ...     ["Level1.lvlib:Class1.lvclass", "Level2.lvlib:Class2.lvclass"],
-        ...     [0x01000000, 0x01000000],
+        ...     [(1, 0, 0, 0), (1, 0, 0, 0)],
         ...     [b'', b'']
         ... )
     """
