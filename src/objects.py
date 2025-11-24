@@ -166,61 +166,40 @@ class LVObjectAdapter(Adapter):
         if padding_needed > 0:
             stream.read(padding_needed)
         
-        # Peek ahead to check if all clusters are empty
-        # Save current position
-        peek_pos = stream.tell()
-        
-        # Read cluster sizes to check if all are empty
-        cluster_sizes = []
-        try:
-            for _ in range(num_levels):
-                size = Int32ub.parse_stream(stream)
-                cluster_sizes.append(size)
-        except:
-            # If we can't read sizes, assume we have VersionList
-            stream.seek(peek_pos)
-            cluster_sizes = None
-        
-        # Reset to saved position
-        stream.seek(peek_pos)
-        
-        # Determine if we should read VersionList
-        # VersionList is included ONLY if at least one cluster has data
-        all_clusters_empty = cluster_sizes is not None and all(s == 0 for s in cluster_sizes)
-        
+        # Always read VersionList (8 bytes per level: 4 x I16)
         versions = []
-        if not all_clusters_empty:
-            # Read VersionList (8 bytes per level: 4 x I16)
-            for _ in range(num_levels):
-                # Version format: major(I16) minor(I16) patch(I16) build(I16)
-                major = Int16ub.parse_stream(stream)
-                minor = Int16ub.parse_stream(stream)
-                patch = Int16ub.parse_stream(stream)
-                build = Int16ub.parse_stream(stream)
-                # Store as tuple for easier handling
-                versions.append((major, minor, patch, build))
-        else:
-            # All clusters empty - no VersionList, use default 0.0.0.0
-            versions = [(0, 0, 0, 0)] * num_levels
+        for _ in range(num_levels):
+            # Version format: major(I16) minor(I16) patch(I16) build(I16)
+            major = Int16ub.parse_stream(stream)
+            minor = Int16ub.parse_stream(stream)
+            patch = Int16ub.parse_stream(stream)
+            build = Int16ub.parse_stream(stream)
+            # Store as tuple for easier handling
+            versions.append((major, minor, patch, build))
         
-        # Read ClusterData for each level
+        # Try to read ClusterData for each level
         # Format: size (I32) + data
+        # If there are no more bytes (all clusters empty), create empty cluster list
         cluster_data = []
         for i in range(num_levels):
-            # Read cluster size
-            size = Int32ub.parse_stream(stream)
-            
-            if size > 0:
-                # Read the actual cluster data
-                if i < len(self.cluster_constructs):
-                    # Use provided construct to parse
-                    data = self.cluster_constructs[i].parse(stream.read(size))
-                    cluster_data.append(data)
+            try:
+                # Try to read cluster size
+                size = Int32ub.parse_stream(stream)
+                
+                if size > 0:
+                    # Read the actual cluster data
+                    if i < len(self.cluster_constructs):
+                        # Use provided construct to parse
+                        data = self.cluster_constructs[i].parse(stream.read(size))
+                        cluster_data.append(data)
+                    else:
+                        # No construct, store raw bytes
+                        cluster_data.append(stream.read(size))
                 else:
-                    # No construct, store raw bytes
-                    cluster_data.append(stream.read(size))
-            else:
-                # Empty cluster
+                    # Empty cluster
+                    cluster_data.append(b'')
+            except:
+                # No more data available - all remaining clusters are empty
                 cluster_data.append(b'')
         
         return {
@@ -306,28 +285,27 @@ class LVObjectAdapter(Adapter):
             cluster_bytes_list.append(cluster_bytes)
         
         all_clusters_empty = all(len(cb) == 0 for cb in cluster_bytes_list)
-        all_versions_zero = all(v == (0, 0, 0, 0) for v in versions)
         
-        # Write VersionList ONLY if at least one cluster has data
-        # OR if any version is non-zero
-        # (If all clusters are empty AND all versions are 0.0.0.0, skip VersionList per LabVIEW spec)
-        if not (all_clusters_empty and all_versions_zero):
-            for version in versions:
-                # Version as tuple (major, minor, patch, build)
-                if not isinstance(version, tuple) or len(version) != 4:
-                    raise ValueError(f"Version must be a 4-tuple (major, minor, patch, build), got {version}")
-                stream.write(Int16ub.build(version[0]))
-                stream.write(Int16ub.build(version[1]))
-                stream.write(Int16ub.build(version[2]))
-                stream.write(Int16ub.build(version[3]))
+        # Always write VersionList when num_levels > 0
+        # (Even when all clusters are empty, VersionList is written as default 0.0.0.0)
+        for version in versions:
+            # Version as tuple (major, minor, patch, build)
+            if not isinstance(version, tuple) or len(version) != 4:
+                raise ValueError(f"Version must be a 4-tuple (major, minor, patch, build), got {version}")
+            stream.write(Int16ub.build(version[0]))
+            stream.write(Int16ub.build(version[1]))
+            stream.write(Int16ub.build(version[2]))
+            stream.write(Int16ub.build(version[3]))
         
-        # Write ClusterData (with size prefix for each cluster)
-        for cluster_bytes in cluster_bytes_list:
-            # Write size prefix
-            stream.write(Int32ub.build(len(cluster_bytes)))
-            # Write data
-            if len(cluster_bytes) > 0:
-                stream.write(cluster_bytes)
+        # Write ClusterData ONLY if at least one cluster has data
+        # When all clusters are empty, don't write any cluster data (not even size prefixes)
+        if not all_clusters_empty:
+            for cluster_bytes in cluster_bytes_list:
+                # Write size prefix
+                stream.write(Int32ub.build(len(cluster_bytes)))
+                # Write data
+                if len(cluster_bytes) > 0:
+                    stream.write(cluster_bytes)
         
         return stream.getvalue()
 
