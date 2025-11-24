@@ -142,7 +142,7 @@ def main():
     serialized = obj_construct.build(obj)
     print(f"Actor Object (single level):")
     print(f"  Class: {obj['class_names'][0]}")
-    print(f"  Version: {obj['versions'][0]:#010x}")
+    print(f"  Version: {obj['versions'][0]} (1.0.0.0)")
     print(f"  HEX (first 40 bytes): {serialized[:40].hex()}...")
     print(f"  NumLevels: {serialized[:4].hex()} (1 level)")
     
@@ -190,9 +190,9 @@ def main():
     print(f"  HEX (first 60 bytes): {serialized[:60].hex()}...")
     
     print(f"\n  Versions:")
-    print(f"    Level 1: {obj['versions'][0]:#010x} (1.0.0.0)")
-    print(f"    Level 2: {obj['versions'][1]:#010x} (1.0.0.7)")
-    print(f"    Level 3: {obj['versions'][2]:#010x} (1.0.0.0)")
+    print(f"    Level 1: {obj['versions'][0]} (1.0.0.0)")
+    print(f"    Level 2: {obj['versions'][1]} (1.0.0.7)")
+    print(f"    Level 3: {obj['versions'][2]} (1.0.0.0)")
     
     deserialized = obj_construct.parse(serialized)
     print(f"\n  Deserialized:")
