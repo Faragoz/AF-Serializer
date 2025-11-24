@@ -319,12 +319,17 @@ def test_boolean_deserialization_false():
     assert result is False
 
 
-def test_boolean_deserialization_invalid_value():
-    """Test Boolean deserialization rejects invalid values."""
-    data = bytes.fromhex("02")  # Invalid: must be 0x00 or 0x01
+def test_boolean_deserialization_nonzero_is_true():
+    """Test Boolean deserialization treats non-zero as True (Flag behavior)."""
+    # Flag treats any non-zero byte as True
+    data = bytes.fromhex("02")  
+    result = lvunflatten(data, LVBoolean)
+    assert result is True
     
-    with pytest.raises(ValidationError):
-        lvunflatten(data, LVBoolean)
+    # 0xFF should also be True
+    data = bytes.fromhex("FF")
+    result = lvunflatten(data, LVBoolean)
+    assert result is True
 
 
 def test_boolean_roundtrip():

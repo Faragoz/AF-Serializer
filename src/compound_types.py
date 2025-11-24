@@ -33,183 +33,29 @@ LVClusterType: TypeAlias = Annotated[tuple, "LabVIEW Cluster"]
 
 
 # ============================================================================
-# Array 1D Implementation
+# Unified Array Implementation
 # ============================================================================
 
 from construct import PrefixedArray
 
-def LVArray1D(element_construct: Construct) -> Construct:
-    """
-    Create a LabVIEW 1D Array construct.
-    
-    Uses Construct's built-in PrefixedArray for clean, declarative definition.
-    
-    LabVIEW 1D arrays are encoded as:
-    - Int32ub (4 bytes, big-endian) number of elements
-    - Elements data (serialized using element type)
-    
-    Format: [num_elements (I32)] + [elements...]
-    Example (3 elements: 1, 2, 3):
-        0000 0003 0000 0001 0000 0002 0000 0003
-    
-    Args:
-        element_construct: Construct definition for array elements (e.g., LVI32)
-    
-    Returns:
-        Construct that can serialize/deserialize 1D arrays
-    
-    Example:
-        >>> from src import LVI32, LVArray1D
-        >>> array_construct = LVArray1D(LVI32)
-        >>> data = array_construct.build([1, 2, 3])
-        >>> print(data.hex())
-        0000000300000001000000020000000003
-    """
-    return PrefixedArray(Int32ub, element_construct)
-
 
 # ============================================================================
-# Array 2D/ND Implementation
+# Array Adapter (Auto-detects 1D or 2D)
 # ============================================================================
 
-class Array2DAdapter(Adapter):
-    """
-    Adapter for LabVIEW 2D/Multi-dimensional Array type.
-    
-    LabVIEW 2D arrays are encoded as:
-    - Int32ub (4 bytes) number of dimensions
-    - Int32ub for each dimension size
-    - Elements data (serialized in row-major order)
-    
-    Format: [num_dims (I32)] [dim1_size] [dim2_size] ... + [elements...]
-    Example (2×3 matrix):
-        0000 0002 0000 0002 0000 0003 [6 elements]
-    """
-    
-    def __init__(self, element_construct: Construct):
-        """
-        Initialize Array2D adapter with element type.
-        
-        Args:
-            element_construct: Construct definition for array elements
-        """
-        self.element_construct = element_construct
-        # We'll use a custom approach since dimensions are variable
-        super().__init__(GreedyBytes)
-    
-    def _decode(self, obj: bytes, context, path) -> list:
-        """Convert bytes to nested Python lists."""
-        import io
-        stream = io.BytesIO(obj)
-        
-        # Read number of dimensions
-        num_dims_bytes = stream.read(4)
-        num_dims = Int32ub.parse(num_dims_bytes)
-        
-        # Read dimension sizes
-        dimensions = []
-        for _ in range(num_dims):
-            dim_bytes = stream.read(4)
-            dimensions.append(Int32ub.parse(dim_bytes))
-        
-        # Calculate total number of elements
-        total_elements = 1
-        for dim in dimensions:
-            total_elements *= dim
-        
-        # Read all elements
-        elements = []
-        for _ in range(total_elements):
-            element_bytes = stream.read(self.element_construct.sizeof())
-            elements.append(self.element_construct.parse(element_bytes))
-        
-        # Reshape into nested list structure
-        if num_dims == 2:
-            result = []
-            idx = 0
-            for _ in range(dimensions[0]):
-                row = []
-                for _ in range(dimensions[1]):
-                    row.append(elements[idx])
-                    idx += 1
-                result.append(row)
-            return result
-        else:
-            # For other dimensions, return flat list
-            return elements
-    
-    def _encode(self, obj: list, context, path) -> bytes:
-        """Convert nested Python lists to bytes."""
-        import io
-        stream = io.BytesIO()
-        
-        # Determine dimensions
-        if isinstance(obj[0], list):
-            # 2D array
-            num_dims = 2
-            dim1 = len(obj)
-            dim2 = len(obj[0]) if obj else 0
-            dimensions = [dim1, dim2]
-            
-            # Flatten the array
-            elements = []
-            for row in obj:
-                elements.extend(row)
-        else:
-            # 1D array treated as 2D with second dimension = 1
-            num_dims = 2
-            dimensions = [len(obj), 1]
-            elements = obj
-        
-        # Write number of dimensions
-        stream.write(Int32ub.build(num_dims))
-        
-        # Write dimension sizes
-        for dim in dimensions:
-            stream.write(Int32ub.build(dim))
-        
-        # Write elements
-        for element in elements:
-            stream.write(self.element_construct.build(element))
-        
-        return stream.getvalue()
-
-
-def LVArray2D(element_construct: Construct) -> Construct:
-    """
-    Create a LabVIEW 2D/Multi-dimensional Array construct.
-    
-    Args:
-        element_construct: Construct definition for array elements
-    
-    Returns:
-        Construct that can serialize/deserialize 2D arrays
-    
-    Example:
-        >>> from src import LVI32, LVArray2D
-        >>> array_construct = LVArray2D(LVI32)
-        >>> data = array_construct.build([[1, 2, 3], [4, 5, 6]])
-        >>> print(data.hex())
-        00000002000000020000000300000001...
-    """
-    return Array2DAdapter(element_construct)
-
-
-# ============================================================================
-# Unified Array Implementation (Auto-detects dimensions)
-# ============================================================================
-
-class UnifiedArrayAdapter(Adapter):
+class ArrayAdapter(Adapter):
     """
     Unified adapter for LabVIEW Arrays that auto-detects dimensions.
     
     Automatically determines if data is 1D or 2D and serializes accordingly:
-    - 1D: [count (I32)] + [elements...]
+    - 1D: [count (I32)] + [elements...] (using PrefixedArray declaratively)
     - 2D: [num_dims (I32)] [dim1] [dim2] + [elements...]
     """
     
     def __init__(self, element_construct: Construct):
         self.element_construct = element_construct
+        # Use PrefixedArray for 1D case declaratively
+        self.array_1d = PrefixedArray(Int32ub, element_construct)
         super().__init__(GreedyBytes)
     
     def _decode(self, obj: bytes, context, path):
@@ -271,15 +117,8 @@ class UnifiedArrayAdapter(Adapter):
             return 4  # Default for I32
     
     def _decode_1d(self, obj: bytes):
-        """Decode as 1D array."""
-        import io
-        stream = io.BytesIO(obj)
-        count = Int32ub.parse_stream(stream)
-        elements = []
-        for _ in range(count):
-            # Use parse_stream to handle variable-length types
-            elements.append(self.element_construct.parse_stream(stream))
-        return elements
+        """Decode as 1D array using declarative PrefixedArray."""
+        return self.array_1d.parse(obj)
     
     def _decode_2d(self, obj: bytes):
         """Decode as 2D array."""
@@ -338,14 +177,10 @@ class UnifiedArrayAdapter(Adapter):
             for row in obj:
                 for element in row:
                     stream.write(self.element_construct.build(element))
+            return stream.getvalue()
         else:
-            # 1D array
-            count = len(obj)
-            stream.write(Int32ub.build(count))
-            for element in obj:
-                stream.write(self.element_construct.build(element))
-        
-        return stream.getvalue()
+            # 1D array - use declarative PrefixedArray
+            return self.array_1d.build(obj)
 
 
 def LVArray(element_construct: Construct) -> Construct:
@@ -353,7 +188,7 @@ def LVArray(element_construct: Construct) -> Construct:
     Create a unified LabVIEW Array construct that auto-detects dimensions.
     
     Automatically handles both 1D and 2D arrays:
-    - For 1D lists: [count] + [elements...]
+    - For 1D lists: [count] + [elements...] (uses PrefixedArray declaratively)
     - For 2D lists (list of lists): [num_dims] [dim1] [dim2] + [elements...]
     
     Args:
@@ -370,7 +205,62 @@ def LVArray(element_construct: Construct) -> Construct:
         >>> # 2D array
         >>> data = array_construct.build([[1, 2], [3, 4]])
     """
-    return UnifiedArrayAdapter(element_construct)
+    return ArrayAdapter(element_construct)
+
+
+# Simplified implementations using declarative Construct primitives
+def LVArray1D(element_construct: Construct) -> Construct:
+    """
+    Create a LabVIEW 1D Array construct.
+    
+    Uses Construct's built-in PrefixedArray for clean, declarative definition.
+    
+    LabVIEW 1D arrays are encoded as:
+    - Int32ub (4 bytes, big-endian) number of elements
+    - Elements data (serialized using element type)
+    
+    Format: [num_elements (I32)] + [elements...]
+    Example (3 elements: 1, 2, 3):
+        0000 0003 0000 0001 0000 0002 0000 0003
+    
+    Args:
+        element_construct: Construct definition for array elements (e.g., LVI32)
+    
+    Returns:
+        Construct that can serialize/deserialize 1D arrays
+    
+    Example:
+        >>> from src import LVI32, LVArray1D
+        >>> array_construct = LVArray1D(LVI32)
+        >>> data = array_construct.build([1, 2, 3])
+        >>> print(data.hex())
+        0000000300000001000000020000000003
+    """
+    # Use Construct's PrefixedArray declaratively - this is the unified, simpler approach
+    return PrefixedArray(Int32ub, element_construct)
+
+
+def LVArray2D(element_construct: Construct) -> Construct:
+    """
+    Create a LabVIEW 2D/Multi-dimensional Array construct.
+    
+    For 2D arrays, use the unified LVArray which auto-detects dimensions.
+    
+    Args:
+        element_construct: Construct definition for array elements
+    
+    Returns:
+        Construct that can serialize/deserialize 2D arrays
+    
+    Example:
+        >>> from src import LVI32, LVArray2D
+        >>> array_construct = LVArray2D(LVI32)
+        >>> data = array_construct.build([[1, 2, 3], [4, 5, 6]])
+        >>> print(data.hex())
+        00000002000000020000000300000001...
+    """
+    # For 2D, use the unified auto-detecting adapter
+    return LVArray(element_construct)
 
 
 # ============================================================================
