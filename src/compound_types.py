@@ -213,30 +213,62 @@ class UnifiedArrayAdapter(Adapter):
         super().__init__(GreedyBytes)
     
     def _decode(self, obj: bytes, context, path):
-        """Auto-detect dimension format and decode."""
+        """
+        Auto-detect dimension format and decode.
+        
+        Detection strategy:
+        - If first I32 == 2, peek at next two I32s
+        - If they look like dimension sizes followed by data that could be elements,
+          treat as 2D
+        - Otherwise treat as 1D
+        
+        Note: This heuristic works for most cases but has edge cases.
+        Use LVArray1D/LVArray2D directly if you need guaranteed behavior.
+        """
         import io
+        import struct
         stream = io.BytesIO(obj)
+        
+        # Handle empty array case
+        if len(obj) == 4:
+            # Could be empty 1D array (just count=0)
+            first_int = Int32ub.parse(obj)
+            if first_int == 0:
+                return []
         
         # Read first I32
         first_int = Int32ub.parse_stream(stream)
         
-        # Peek at next 4 bytes to determine if 1D or 2D
+        # Heuristic for 2D detection
         next_pos = stream.tell()
         try:
+            # Read next two I32s
             second_int = Int32ub.parse_stream(stream)
+            third_int = Int32ub.parse_stream(stream)
             stream.seek(next_pos)  # Reset position
             
-            # Heuristic: if first_int is 2 and second_int looks like a reasonable dimension,
-            # it's likely 2D. Otherwise, treat as 1D.
-            if first_int == 2 and 0 < second_int < 10000:
-                # Likely 2D with 2 dimensions
-                return self._decode_2d(obj)
-            else:
-                # Treat as 1D
-                return self._decode_1d(obj)
-        except:
-            # If we can't read more, treat as 1D
+            # If first_int == 2 (num_dims), second and third should be dimension sizes
+            # They should be positive and reasonable (not too large, not data values)
+            if (first_int == 2 and 
+                0 < second_int < 1000 and 
+                0 < third_int < 1000):
+                # Check if total bytes makes sense for 2D
+                expected_size = 12 + (second_int * third_int * self._estimate_element_size())
+                if abs(len(obj) - expected_size) < 100:  # Some tolerance
+                    return self._decode_2d(obj)
+            
+            # Otherwise treat as 1D
             return self._decode_1d(obj)
+        except (EOFError, struct.error):
+            # If we can't read enough data, treat as 1D
+            return self._decode_1d(obj)
+    
+    def _estimate_element_size(self) -> int:
+        """Estimate element size for heuristic. Returns 4 as default."""
+        try:
+            return self.element_construct.sizeof()
+        except:
+            return 4  # Default for I32
     
     def _decode_1d(self, obj: bytes):
         """Decode as 1D array."""
@@ -285,6 +317,12 @@ class UnifiedArrayAdapter(Adapter):
         """Auto-detect dimensions and encode."""
         import io
         stream = io.BytesIO()
+        
+        # Handle empty array
+        if not obj:
+            # Empty 1D array: just count of 0
+            stream.write(Int32ub.build(0))
+            return stream.getvalue()
         
         # Check if 1D or 2D
         if isinstance(obj[0], list):
