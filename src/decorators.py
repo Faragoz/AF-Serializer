@@ -98,8 +98,6 @@ def lvclass(library: str = "", class_name: Optional[str] = None,
             Returns:
                 Dictionary suitable for LVObject serialization
             """
-            import io
-            
             # Walk up the inheritance chain to find all @lvclass decorated base classes
             inheritance_chain = []
             for base in inspect.getmro(self.__class__):
@@ -117,37 +115,24 @@ def lvclass(library: str = "", class_name: Optional[str] = None,
                 versions.append(level_class.__lv_version__)
             
             # Build cluster data for each level
+            # The decorator extracts type hints and values, Object.py does the serialization
             cluster_data_list = []
             for i, level_class in enumerate(inheritance_chain):
                 # Get type hints for this specific level
                 level_hints = level_class.__annotations__ if hasattr(level_class, '__annotations__') else {}
                 
-                if not level_hints:
-                    # No fields at this level - empty cluster
-                    cluster_data_list.append(b'')
-                else:
-                    # Serialize fields defined at this level
-                    stream = io.BytesIO()
-                    for attr_name, attr_type in level_hints.items():
-                        if hasattr(self, attr_name):
-                            value = getattr(self, attr_name)
-                            
-                            # Serialize based on type hint
-                            # Check for Construct types FIRST (they have .build method)
-                            if hasattr(attr_type, 'build'):
-                                # It's a Construct type (LVI32, LVU16, LVString, etc.)
-                                stream.write(attr_type.build(value))
-                            # Then check for Python types
-                            elif attr_type == str or isinstance(value, str):
-                                stream.write(LVString.build(value))
-                            elif attr_type == bool or isinstance(value, bool):
-                                stream.write(LVBoolean.build(value))
-                            elif attr_type == int or isinstance(value, int):
-                                stream.write(LVI32.build(value))
-                            elif attr_type == float or isinstance(value, float):
-                                stream.write(LVDouble.build(value))
-                    
-                    cluster_data_list.append(stream.getvalue())
+                # Extract values that exist on this instance
+                level_values = {}
+                for attr_name in level_hints.keys():
+                    if hasattr(self, attr_name):
+                        level_values[attr_name] = getattr(self, attr_name)
+                
+                # Let Object.py handle the serialization
+                # This also handles the case where if ANY type hint has a value,
+                # ALL type hints are serialized with defaults
+                from .objects import serialize_type_hints
+                cluster_bytes = serialize_type_hints(level_hints, level_values)
+                cluster_data_list.append(cluster_bytes)
             
             # Use only the most derived class name
             most_derived = inheritance_chain[-1]

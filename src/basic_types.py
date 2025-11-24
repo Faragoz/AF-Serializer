@@ -20,10 +20,8 @@ from construct import (
     Int32sb, Int32ub,
     Int64sb, Int64ub,
     Float32b, Float64b,
-    Byte,
     PascalString,
-    Adapter,
-    ValidationError,
+    Flag,
 )
 
 # ============================================================================
@@ -85,33 +83,19 @@ LVSingle = Float32b
 
 
 # ============================================================================
-# Boolean Adapter with Validation
+# Boolean Type
 # ============================================================================
 
-class BooleanAdapter(Adapter):
-    """
-    Adapter for LabVIEW Boolean type.
-    
-    LabVIEW represents booleans as a single byte:
-    - 0x00 = False
-    - 0x01 = True
-    
-    This adapter validates that only 0x00 or 0x01 values are used.
-    """
-    
-    def _decode(self, obj: int, context, path) -> bool:
-        """Convert byte value to Python bool."""
-        if obj not in (0, 1):
-            raise ValidationError(f"Invalid boolean value: {obj:#04x}. Must be 0x00 or 0x01.")
-        return bool(obj)
-    
-    def _encode(self, obj: bool, context, path) -> int:
-        """Convert Python bool to byte value."""
-        return 1 if obj else 0
+LVBoolean = Flag
+"""
+LabVIEW Boolean: 8-bit boolean (0x00 or 0x01).
 
+Uses Construct's built-in Flag for clean, declarative definition.
+Maps 0x00 to False and any non-zero byte to True.
 
-LVBoolean = BooleanAdapter(Byte)
-"""LabVIEW Boolean: 8-bit boolean with validation (0x00 or 0x01)."""
+Note: Flag is more permissive than strict validation - any non-zero byte
+is treated as True, not just 0x01. This is standard boolean behavior.
+"""
 
 
 # ============================================================================
