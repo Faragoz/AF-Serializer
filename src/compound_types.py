@@ -37,20 +37,25 @@ class ArrayNDAdapter(Adapter):
     
     This adapter handles all array dimensions (1D, 2D, 3D, etc.) automatically.
     
+    LabVIEW Array Format:
+        [dim0 (I32)] [dim1 (I32)] ... [dimN-1 (I32)] [elements...]
+        
+    The dimensions are read until: prod(dims) * element_size == remaining_bytes
+    
     For 1D arrays:
         Format: [num_elements (I32)] [elements...]
         Example: [1, 2, 3] -> 0000 0003 0000 0001 0000 0002 0000 0003
     
     For ND arrays (2D, 3D, etc.):
-        Format: [num_dims (I32)] [dim0 (I32)] ... [dimN-1 (I32)] [elements...]
-        Example 2D (2×3): 0000 0002 0000 0002 0000 0003 [6 elements]
-        Example 3D (2×4×4): 0000 0003 0000 0002 0000 0004 0000 0004 [32 elements]
+        Format: [dim0 (I32)] [dim1 (I32)] ... [elements...]
+        Example 2D (2×3): 0000 0002 0000 0003 [6 elements]
+        Example 3D (2×4×4): 0000 0002 0000 0004 0000 0004 [32 elements]
     
     Elements are stored in row-major order (C-style).
     
     The dimension detection works as follows:
     - When building: Analyzes the nested list structure to determine dimensions
-    - When parsing: Reads num_dims from the header, then reads that many dimension sizes
+    - When parsing: Reads dimensions until prod(dims) * element_size == remaining_bytes
     """
     
     def __init__(self, element_type: Construct):
@@ -66,106 +71,83 @@ class ArrayNDAdapter(Adapter):
     def _decode(self, obj: bytes, context, path) -> List:
         """Convert bytes to Python list (1D) or nested list (ND)."""
         import io
-        stream = io.BytesIO(obj)
+        import math
         
-        # Read first I32 - this is num_dims for ND arrays, or count for 1D
-        first_value = Int32ub.parse_stream(stream)
-        
-        if first_value == 0:
+        if len(obj) == 0:
             return []
         
-        # For 1D arrays, first_value is the count of elements
-        # For ND arrays, first_value is num_dims (2, 3, 4, etc.)
-        # We need to determine which case this is
-        
-        # Get element size if possible
+        # Get element size - required for dimension detection
         element_size = None
         try:
             element_size = self.element_type.sizeof()
         except (TypeError, AttributeError):
-            # Variable size element, can't easily verify
+            # Variable size element - fall back to simple 1D parsing
             pass
         
-        # First, check if it's a simple 1D array
-        if element_size is not None:
-            remaining_after_first = len(obj) - 4  # After first I32
-            if remaining_after_first == first_value * element_size:
-                # Perfect match for 1D array
-                elements = []
-                for _ in range(first_value):
-                    element = self.element_type.parse_stream(stream)
-                    elements.append(element)
-                return elements
+        if element_size is None:
+            # Can't determine dimensions without knowing element size
+            # Fall back to simple 1D array parsing
+            stream = io.BytesIO(obj)
+            count = Int32ub.parse_stream(stream)
+            if count == 0:
+                return []
+            elements = []
+            for _ in range(count):
+                element = self.element_type.parse_stream(stream)
+                elements.append(element)
+            return elements
         
-        # Try to interpret as ND array (first_value is num_dims)
-        if first_value >= 2:  # Could be num_dims for 2D or higher
-            current_pos = stream.tell()
+        # Read dimensions until prod(dims) * element_size == remaining_bytes
+        # This is the LabVIEW format for ND arrays
+        dims = []
+        offset = 0
+        total_bytes = len(obj)
+        
+        while offset < total_bytes:
+            # Read potential next dimension
+            if offset + 4 > total_bytes:
+                break
             
-            # Read potential dimension sizes
-            potential_dims = []
-            try:
-                for _ in range(first_value):
-                    dim = Int32ub.parse_stream(stream)
-                    potential_dims.append(dim)
-                
-                # Calculate expected elements from dims
-                expected_elements = 1
-                for d in potential_dims:
-                    if d <= 0:
-                        # Invalid dimension, not an ND array
-                        break
-                    expected_elements *= d
-                else:
-                    # All dims valid, check if element count matches
-                    if element_size is not None:
-                        bytes_for_elements = expected_elements * element_size
-                        actual_remaining = len(obj) - stream.tell()
-                        
-                        if bytes_for_elements == actual_remaining:
-                            # This is an ND array!
-                            return self._parse_nd_elements(stream, potential_dims)
-                    else:
-                        # Variable size elements - try to parse and see if it works
-                        try:
-                            result = self._parse_nd_elements(stream, potential_dims)
-                            # Verify we consumed all bytes
-                            if stream.tell() == len(obj):
-                                return result
-                        except Exception:
-                            pass
-            except Exception:
-                pass
+            next_dim = int.from_bytes(obj[offset:offset+4], 'big')
+            potential_dims = dims + [next_dim]
             
-            # Reset and try as 1D array
-            stream.seek(current_pos)
+            # Calculate product of dimensions
+            prod = math.prod(potential_dims) if potential_dims else 0
+            
+            # Calculate remaining bytes after reading this dimension
+            remaining_after = total_bytes - (offset + 4)
+            
+            # Check if prod * element_size matches remaining bytes
+            if prod * element_size == remaining_after:
+                # Found the correct number of dimensions!
+                dims = potential_dims
+                offset += 4
+                break
+            elif prod * element_size > remaining_after:
+                # Too many elements, stop here
+                break
+            else:
+                # Not enough elements yet, add this dimension and continue
+                dims = potential_dims
+                offset += 4
         
-        # Parse as 1D array - first_value is the count
-        # Reset to beginning and re-read
-        stream.seek(4)  # Skip the first I32 (count)
-        elements = []
-        for _ in range(first_value):
-            element = self.element_type.parse_stream(stream)
-            elements.append(element)
+        if not dims:
+            # No valid dimensions found, return empty
+            return []
         
-        return elements
-    
-    def _parse_nd_elements(self, stream, dims: List[int]) -> List:
-        """Parse ND array elements and reshape to nested list."""
-        total_elements = 1
-        for d in dims:
-            total_elements *= d
-        
-        if total_elements == 0:
-            return self._create_empty_nested_list(dims)
-        
-        # Read elements in row-major order
+        # Parse elements
+        stream = io.BytesIO(obj[offset:])
+        total_elements = math.prod(dims)
         elements = []
         for _ in range(total_elements):
             element = self.element_type.parse_stream(stream)
             elements.append(element)
         
         # Reshape to nested list based on dimensions
-        return self._reshape_to_nested_list(elements, dims)
+        if len(dims) == 1:
+            return elements
+        else:
+            return self._reshape_to_nested_list(elements, dims)
     
     def _encode(self, obj: List, context, path) -> bytes:
         """Convert Python list or nested list to bytes."""
@@ -179,23 +161,15 @@ class ArrayNDAdapter(Adapter):
         
         # Determine dimensions from the nested list
         dims = self._get_dimensions(obj)
-        num_dims = len(dims)
         
-        if num_dims == 1:
-            # 1D array - just write count and elements
-            stream.write(Int32ub.build(dims[0]))
-            for element in obj:
-                stream.write(self.element_type.build(element))
-        else:
-            # ND array - write num_dims, dimension sizes, then elements
-            stream.write(Int32ub.build(num_dims))
-            for dim_size in dims:
-                stream.write(Int32ub.build(dim_size))
-            
-            # Flatten and write elements in row-major order
-            flat_elements = self._flatten_nested_list(obj)
-            for element in flat_elements:
-                stream.write(self.element_type.build(element))
+        # Write all dimension sizes (no num_dims header in LabVIEW format)
+        for dim_size in dims:
+            stream.write(Int32ub.build(dim_size))
+        
+        # Flatten and write elements in row-major order
+        flat_elements = self._flatten_nested_list(obj)
+        for element in flat_elements:
+            stream.write(self.element_type.build(element))
         
         return stream.getvalue()
     
@@ -264,11 +238,10 @@ def LVArray(element_type):
     This is a universal array type that handles 1D, 2D, 3D, and higher 
     dimensional arrays automatically based on the data structure.
     
-    For 1D arrays:
-        Format: [num_elements (I32)] [elements...]
+    LabVIEW Array Format:
+        [dim0 (I32)] [dim1 (I32)] ... [dimN-1 (I32)] [elements...]
         
-    For ND arrays (2D, 3D, etc.):
-        Format: [num_dims (I32)] [dim0 (I32)] ... [dimN-1 (I32)] [elements...]
+    Dimensions are detected by reading until: prod(dims) * element_size == remaining_bytes
     
     Args:
         element_type: Construct type for array elements
@@ -286,19 +259,21 @@ def LVArray(element_type):
         >>> arr.parse(data)
         [1, 2, 3]
         
-        2D Array:
+        2D Array (2×3):
         >>> arr = LVArray(LVI32)
         >>> data = arr.build([[1, 2, 3], [4, 5, 6]])
         >>> print(data.hex())
-        000000020000000200000003000000010000000200000003000000040000000500000006
+        0000000200000003000000010000000200000003000000040000000500000006
         >>> arr.parse(data)
         [[1, 2, 3], [4, 5, 6]]
         
         3D Array (2×4×4):
         >>> arr = LVArray(LVI32)
-        >>> data_3d = [[[1,2,3,4], [5,6,7,8], [9,10,11,12], [13,14,15,16]],
-        ...            [[17,18,19,20], [21,22,23,24], [25,26,27,28], [29,30,31,32]]]
+        >>> data_3d = [[[7,0,0,0], [8,0,0,0], [0,0,3,0], [0,0,0,5]],
+        ...            [[0,0,0,0], [0,0,0,0], [0,0,0,6], [0,0,0,0]]]
         >>> serialized = arr.build(data_3d)
+        >>> print(serialized[:12].hex())  # First 3 dimension values
+        000000020000000400000004
     """
     return ArrayNDAdapter(element_type)
 

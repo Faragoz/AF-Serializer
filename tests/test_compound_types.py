@@ -88,24 +88,23 @@ def test_array1d_roundtrip_parametrized(data):
 def test_array2d_serialization_2x3_matrix():
     """Validate Array2D serialization for 2×3 matrix."""
     # 2×3 matrix: [[1, 2, 3], [4, 5, 6]]
-    # Expected: 0000 0002 0000 0002 0000 0003 [6 elements]
+    # Format: [dim0=2 (I32)] [dim1=3 (I32)] [6 elements]
     array_construct = LVArray2D(LVI32)
     data = [[1, 2, 3], [4, 5, 6]]
     
     result = array_construct.build(data)
     
-    # Check header
-    assert result[:4].hex() == "00000002"  # num_dims = 2
-    assert result[4:8].hex() == "00000002"  # dim1 = 2
-    assert result[8:12].hex() == "00000003"  # dim2 = 3
+    # Check header (dimensions only, no num_dims)
+    assert result[:4].hex() == "00000002"  # dim0 = 2
+    assert result[4:8].hex() == "00000003"  # dim1 = 3
     
     # Check elements
-    assert result[12:16].hex() == "00000001"  # element 0
-    assert result[16:20].hex() == "00000002"  # element 1
-    assert result[20:24].hex() == "00000003"  # element 2
-    assert result[24:28].hex() == "00000004"  # element 3
-    assert result[28:32].hex() == "00000005"  # element 4
-    assert result[32:36].hex() == "00000006"  # element 5
+    assert result[8:12].hex() == "00000001"  # element 0
+    assert result[12:16].hex() == "00000002"  # element 1
+    assert result[16:20].hex() == "00000003"  # element 2
+    assert result[20:24].hex() == "00000004"  # element 3
+    assert result[24:28].hex() == "00000005"  # element 4
+    assert result[28:32].hex() == "00000006"  # element 5
 
 
 def test_array2d_deserialization_roundtrip():
@@ -152,27 +151,26 @@ def test_array2d_roundtrip_parametrized(data):
 def test_array3d_serialization_2x2x2():
     """Validate Array3D serialization for 2×2×2 cube."""
     # 2×2×2 cube
-    # Expected: 0000 0003 0000 0002 0000 0002 0000 0002 [8 elements]
+    # Format: [dim0=2 (I32)] [dim1=2 (I32)] [dim2=2 (I32)] [8 elements]
     array_construct = LVArray(LVI32)
     data = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
     
     result = array_construct.build(data)
     
-    # Check header
-    assert result[:4].hex() == "00000003"  # num_dims = 3
-    assert result[4:8].hex() == "00000002"  # dim0 = 2
-    assert result[8:12].hex() == "00000002"  # dim1 = 2
-    assert result[12:16].hex() == "00000002"  # dim2 = 2
+    # Check header (dimensions only, no num_dims)
+    assert result[:4].hex() == "00000002"  # dim0 = 2
+    assert result[4:8].hex() == "00000002"  # dim1 = 2
+    assert result[8:12].hex() == "00000002"  # dim2 = 2
     
     # Check elements (row-major order)
-    assert result[16:20].hex() == "00000001"  # element 0
-    assert result[20:24].hex() == "00000002"  # element 1
-    assert result[24:28].hex() == "00000003"  # element 2
-    assert result[28:32].hex() == "00000004"  # element 3
-    assert result[32:36].hex() == "00000005"  # element 4
-    assert result[36:40].hex() == "00000006"  # element 5
-    assert result[40:44].hex() == "00000007"  # element 6
-    assert result[44:48].hex() == "00000008"  # element 7
+    assert result[12:16].hex() == "00000001"  # element 0
+    assert result[16:20].hex() == "00000002"  # element 1
+    assert result[20:24].hex() == "00000003"  # element 2
+    assert result[24:28].hex() == "00000004"  # element 3
+    assert result[28:32].hex() == "00000005"  # element 4
+    assert result[32:36].hex() == "00000006"  # element 5
+    assert result[36:40].hex() == "00000007"  # element 6
+    assert result[40:44].hex() == "00000008"  # element 7
 
 
 def test_array3d_deserialization_roundtrip():
@@ -197,11 +195,10 @@ def test_array3d_2x4x4_roundtrip():
     
     serialized = array_construct.build(data)
     
-    # Check header
-    assert serialized[:4].hex() == "00000003"  # num_dims = 3
-    assert serialized[4:8].hex() == "00000002"  # dim0 = 2
-    assert serialized[8:12].hex() == "00000004"  # dim1 = 4
-    assert serialized[12:16].hex() == "00000004"  # dim2 = 4
+    # Check header (dimensions only, no num_dims)
+    assert serialized[:4].hex() == "00000002"  # dim0 = 2
+    assert serialized[4:8].hex() == "00000004"  # dim1 = 4
+    assert serialized[8:12].hex() == "00000004"  # dim2 = 4
     
     # Roundtrip
     deserialized = array_construct.parse(serialized)
