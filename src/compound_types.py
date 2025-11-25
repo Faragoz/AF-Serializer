@@ -16,7 +16,6 @@ from construct import (
     Construct,
     Adapter,
     GreedyBytes,
-    PrefixedArray,
 )
 
 # ============================================================================

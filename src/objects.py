@@ -431,10 +431,7 @@ def serialize_type_hints(type_hints: dict, values: dict) -> bytes:
                 elif attr_type in (LVDouble, LVSingle):
                     value = 0.0
                 elif isinstance(attr_type, ArrayNDAdapter):
-                    # LVArray2D, LVArrayND - default to empty list
-                    value = []
-                elif hasattr(attr_type, 'subcon'):
-                    # PrefixedArray (LVArray, LVArray1D) - default to empty list
+                    # LVArray, LVArray1D, LVArray2D, LVArrayND - default to empty list
                     value = []
                 else:
                     print(f"Warning: Unknown Construct type for attribute '{attr_name}:{attr_type}, skipping serialization.")
