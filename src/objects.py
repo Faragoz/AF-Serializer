@@ -22,14 +22,12 @@ from construct import (
     Int8ub,
     Int16ub,
     Int32ub,
-    Bytes,
     GreedyBytes,
     Construct,
     Adapter,
-    this,
-    Padding,
+    PrefixedArray
 )
-
+from .compound_types import LVArray
 
 # ============================================================================
 # Type Aliases
@@ -302,8 +300,8 @@ class LVObjectAdapter(Adapter):
         all_clusters_empty = all(len(cb) == 0 for cb in cluster_bytes_list)
 
         # If all clusters are empty and no versions provided, use default versions
-        if all_clusters_empty and not versions:
-            versions = [(0, 0, 0, 0)] * num_levels
+        if all_clusters_empty:
+            versions = [(0, 0, 0, 0)]
         
         # Always write VersionList when num_levels > 0
         # Use declarative VersionStruct for clean serialization
@@ -432,6 +430,7 @@ def serialize_type_hints(type_hints: dict, values: dict) -> bytes:
                 elif attr_type in (LVDouble, LVSingle):
                     value = 0.0
                 else:
+                    print(f"Warning: Unknown Construct type for attribute '{attr_name}:{attr_type}, skipping serialization.")
                     # Unknown Construct type - skip
                     continue
             elif attr_type == str:

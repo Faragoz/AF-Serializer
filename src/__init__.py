@@ -67,13 +67,9 @@ from .basic_types import (
 
 from .compound_types import (
     # Compound type factories
-    LVArray1D,
-    LVArray2D,
     LVArray,
     LVCluster,
     # Type aliases
-    LVArray1DType,
-    LVArray2DType,
     LVArrayType,
     LVClusterType,
 )
@@ -121,12 +117,8 @@ __all__ = [
     "LVBooleanType",
     "LVStringType",
     # Compound types
-    "LVArray1D",
-    "LVArray2D",
     "LVArray",
     "LVCluster",
-    "LVArray1DType",
-    "LVArray2DType",
     "LVArrayType",
     "LVClusterType",
     # Object types

@@ -10,7 +10,7 @@ Supported Types:
     - Integers: I32, U32, I16, U16, I8, U8, I64, U64
     - Floating Point: Double (Float64), Single (Float32)
     - Boolean: 8-bit boolean (0x00 or 0x01)
-    - String: Pascal String with Int32ub length prefix + UTF-8 encoding
+    - String: Pascal String with Int32ub length prefix + MBCS encoding
 """
 
 from typing import TypeAlias, Annotated
@@ -20,8 +20,8 @@ from construct import (
     Int32sb, Int32ub,
     Int64sb, Int64ub,
     Float32b, Float64b,
-    PascalString,
     Flag,
+    Adapter, Struct, Bytes, this
 )
 
 # ============================================================================
@@ -39,7 +39,7 @@ LVU64Type: TypeAlias = Annotated[int, "LabVIEW U64 (unsigned 64-bit integer)"]
 LVDoubleType: TypeAlias = Annotated[float, "LabVIEW Double (64-bit IEEE 754)"]
 LVSingleType: TypeAlias = Annotated[float, "LabVIEW Single (32-bit IEEE 754)"]
 LVBooleanType: TypeAlias = Annotated[bool, "LabVIEW Boolean (8-bit, 0x00 or 0x01)"]
-LVStringType: TypeAlias = Annotated[str, "LabVIEW String (Pascal String, UTF-8)"]
+LVStringType: TypeAlias = Annotated[str, "LabVIEW String (Pascal String, MBCS)"]
 
 
 # ============================================================================
@@ -102,13 +102,29 @@ is treated as True, not just 0x01. This is standard boolean behavior.
 # String Type (Pascal String with Int32ub Prefix)
 # ============================================================================
 
-LVString = PascalString(Int32ub, "utf-8")
+class PascalMBCSAdapter(Adapter):
+    def __init__(self, encoding="mbcs"):
+        super().__init__(Struct(
+            "length" / Int32ub,
+            "data" / Bytes(this.length)
+        ))
+        self.encoding = encoding
+
+    def _encode(self, obj, context, path):
+        raw = obj.encode(self.encoding)
+        return {"length": len(raw), "data": raw}
+
+    def _decode(self, obj, context, path):
+        return obj.data.decode(self.encoding)
+
+LVString = PascalMBCSAdapter()
+#LVString = PascalString(Int32ub, "utf-8")
 """
-LabVIEW String: Pascal String with Int32ub length prefix + UTF-8 encoding.
+LabVIEW String: Pascal String with Int32ub length prefix + MBCS encoding.
 
-Uses Construct's built-in PascalString for clean, declarative definition.
+Uses Construct's built-in Adapter for clean, declarative definition.
 
-Format: [length (I32)] + [UTF-8 bytes]
+Format: [length (I32)] + [MBCS bytes]
 Example: "Hello" -> 00000005 48656C6C6F
 """
 
