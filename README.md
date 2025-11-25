@@ -141,16 +141,44 @@ The auto-detection system (`_auto_infer_type()`) uses these rules:
 
 ### Arrays
 
+LVArray automatically handles 1D, 2D, 3D, and higher dimensional arrays.
+
 **1D Array**: `[num_elements (I32)] + [elements...]`
 ```python
-lvflatten([1, 2, 3])
+from src import LVArray, LVI32
+
+arr = LVArray(LVI32)
+data = arr.build([1, 2, 3])
 # Output: 00000003 00000001 00000002 00000003
+
+parsed = arr.parse(data)  # Returns [1, 2, 3]
 ```
 
-**2D Array**: `[num_dims (I32)] [dim1_size] [dim2_size] + [elements...]`
+**2D Array**: `[num_dims (I32)] [dim0_size] [dim1_size] + [elements...]`
 ```python
-# Future: lvflatten([[1,2,3], [4,5,6]])
+from src import LVArray, LVI32
+
+arr = LVArray(LVI32)
+data = arr.build([[1, 2, 3], [4, 5, 6]])
 # Output: 00000002 00000002 00000003 00000001 00000002 00000003 00000004 00000005 00000006
+
+parsed = arr.parse(data)  # Returns [[1, 2, 3], [4, 5, 6]]
+```
+
+**3D Array**: `[num_dims (I32)] [dim0_size] [dim1_size] [dim2_size] + [elements...]`
+```python
+from src import LVArray, LVI32
+
+arr = LVArray(LVI32)
+# 2×4×4 array
+data_3d = [
+    [[7, 0, 0, 0], [8, 0, 0, 0], [0, 0, 3, 0], [0, 0, 0, 5]],
+    [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 6], [0, 0, 0, 0]]
+]
+serialized = arr.build(data_3d)
+# Header: 00000003 00000002 00000004 00000004 (num_dims=3, dims=2,4,4)
+
+parsed = arr.parse(serialized)  # Returns the original 3D array
 ```
 
 ### Clusters
@@ -176,7 +204,7 @@ lvflatten("Hello")
 - **Numeric**: int8, int16, int32, int64, uint8, uint16, uint32, uint64, float32, float64
 - **Boolean**: 8-bit boolean
 - **String**: Length-prefixed UTF-8 strings
-- **Array**: 1D arrays of homogeneous types
+- **Array**: 1D, 2D, 3D, and N-dimensional arrays of homogeneous types (auto-detects dimensions)
 - **Cluster**: Ordered collections of heterogeneous types
 - **Variant**: Type descriptor + data
 - **Objects**: LabVIEW objects with inheritance support
@@ -304,15 +332,16 @@ Infer LabVIEW type from Python data. Used internally by `lvflatten()`.
 ### ✅ Completed
 - [x] Auto-detection of Python types
 - [x] Modular architecture with clear separation of concerns
-- [x] Array 1D serialization (validated against HEX examples)
+- [x] Array 1D/2D/3D/ND serialization (validated against HEX examples)
 - [x] Cluster serialization (validated against HEX examples)
 - [x] Basic types (I32, Double, Boolean, String)
 - [x] Backward compatibility layer
-- [x] Comprehensive test suite (25 tests)
+- [x] Comprehensive test suite
 - [x] @lvclass decorator for custom objects
+- [x] LVArray auto-detection of dimensions (1D, 2D, 3D, ND)
+- [x] LVArray default value `[]` in Objects.py for type hints
 
 ### 🚧 In Progress / Future Work
-- [ ] Array 2D/3D support
 - [ ] Fixed Point serialization
 - [ ] Complete LVObject serialization (Actor, Commander, etc.)
 - [ ] Deserialization (lvunflatten)

@@ -10,7 +10,7 @@ from construct import ConstructError
 
 from src import (
     LVI32, LVU16, LVString,
-    LVArray1D, LVArray2D, LVCluster,
+    LVArray, LVArray1D, LVArray2D, LVCluster,
 )
 
 
@@ -138,6 +138,84 @@ def test_array2d_single_row():
 def test_array2d_roundtrip_parametrized(data):
     """Test Array2D roundtrip with various data."""
     array_construct = LVArray2D(LVI32)
+    
+    serialized = array_construct.build(data)
+    deserialized = array_construct.parse(serialized)
+    
+    assert deserialized == data
+
+
+# ============================================================================
+# Array 3D Tests
+# ============================================================================
+
+def test_array3d_serialization_2x2x2():
+    """Validate Array3D serialization for 2×2×2 cube."""
+    # 2×2×2 cube
+    # Expected: 0000 0003 0000 0002 0000 0002 0000 0002 [8 elements]
+    array_construct = LVArray(LVI32)
+    data = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
+    
+    result = array_construct.build(data)
+    
+    # Check header
+    assert result[:4].hex() == "00000003"  # num_dims = 3
+    assert result[4:8].hex() == "00000002"  # dim0 = 2
+    assert result[8:12].hex() == "00000002"  # dim1 = 2
+    assert result[12:16].hex() == "00000002"  # dim2 = 2
+    
+    # Check elements (row-major order)
+    assert result[16:20].hex() == "00000001"  # element 0
+    assert result[20:24].hex() == "00000002"  # element 1
+    assert result[24:28].hex() == "00000003"  # element 2
+    assert result[28:32].hex() == "00000004"  # element 3
+    assert result[32:36].hex() == "00000005"  # element 4
+    assert result[36:40].hex() == "00000006"  # element 5
+    assert result[40:44].hex() == "00000007"  # element 6
+    assert result[44:48].hex() == "00000008"  # element 7
+
+
+def test_array3d_deserialization_roundtrip():
+    """Test Array3D serialize → deserialize → compare."""
+    array_construct = LVArray(LVI32)
+    original = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
+    
+    serialized = array_construct.build(original)
+    deserialized = array_construct.parse(serialized)
+    
+    assert deserialized == original
+
+
+def test_array3d_2x4x4_roundtrip():
+    """Test Array3D with 2×4×4 shape (from user example)."""
+    array_construct = LVArray(LVI32)
+    # Create 2×4×4 array with specific values
+    data = [
+        [[7, 0, 0, 0], [8, 0, 0, 0], [0, 0, 3, 0], [0, 0, 0, 5]],
+        [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 6], [0, 0, 0, 0]]
+    ]
+    
+    serialized = array_construct.build(data)
+    
+    # Check header
+    assert serialized[:4].hex() == "00000003"  # num_dims = 3
+    assert serialized[4:8].hex() == "00000002"  # dim0 = 2
+    assert serialized[8:12].hex() == "00000004"  # dim1 = 4
+    assert serialized[12:16].hex() == "00000004"  # dim2 = 4
+    
+    # Roundtrip
+    deserialized = array_construct.parse(serialized)
+    assert deserialized == data
+
+
+@pytest.mark.parametrize("data", [
+    [[[1, 2], [3, 4]], [[5, 6], [7, 8]]],  # 2×2×2
+    [[[1, 2, 3], [4, 5, 6]]],  # 1×2×3
+    [[[1], [2]], [[3], [4]], [[5], [6]]],  # 3×2×1
+])
+def test_array3d_roundtrip_parametrized(data):
+    """Test Array3D roundtrip with various shapes."""
+    array_construct = LVArray(LVI32)
     
     serialized = array_construct.build(data)
     deserialized = array_construct.parse(serialized)

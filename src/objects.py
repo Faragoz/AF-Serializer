@@ -398,6 +398,7 @@ def serialize_type_hints(type_hints: dict, values: dict) -> bytes:
         LVI32, LVU32, LVI16, LVU16, LVI8, LVU8, LVI64, LVU64,
         LVString, LVBoolean, LVDouble, LVSingle
     )
+    from .compound_types import ArrayNDAdapter
     import io
     
     if not type_hints:
@@ -429,6 +430,12 @@ def serialize_type_hints(type_hints: dict, values: dict) -> bytes:
                     value = 0
                 elif attr_type in (LVDouble, LVSingle):
                     value = 0.0
+                elif isinstance(attr_type, ArrayNDAdapter):
+                    # LVArray2D, LVArrayND - default to empty list
+                    value = []
+                elif hasattr(attr_type, 'subcon'):
+                    # PrefixedArray (LVArray, LVArray1D) - default to empty list
+                    value = []
                 else:
                     print(f"Warning: Unknown Construct type for attribute '{attr_name}:{attr_type}, skipping serialization.")
                     # Unknown Construct type - skip
@@ -441,6 +448,9 @@ def serialize_type_hints(type_hints: dict, values: dict) -> bytes:
                 value = 0
             elif attr_type == float:
                 value = 0.0
+            elif attr_type == list:
+                # Python list type hint - default to empty list
+                value = []
             else:
                 # Unknown type - skip
                 continue
@@ -448,7 +458,7 @@ def serialize_type_hints(type_hints: dict, values: dict) -> bytes:
         # Serialize based on type hint
         # Check for Construct types FIRST (they have .build method)
         if hasattr(attr_type, 'build'):
-            # It's a Construct type (LVI32, LVU16, LVString, etc.)
+            # It's a Construct type (LVI32, LVU16, LVString, LVArray, etc.)
             stream.write(attr_type.build(value))
         # Then check for Python types
         elif attr_type == str or isinstance(value, str):
