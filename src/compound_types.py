@@ -7,18 +7,15 @@ using the Construct library.
 All types use big-endian byte order (network byte order) as required by LabVIEW.
 
 Supported Types:
-    - Array1D: 1D arrays with homogeneous elements
-    - Array2D: 2D/ND arrays with dimension information
+    - LVArray: Universal array type that auto-detects dimensions (1D, 2D, 3D, etc.)
     - Cluster: Heterogeneous collections (no header, direct concatenation)
 """
-from email.policy import default
 from typing import TypeAlias, Annotated, List, Any, Sequence
 from construct import (
     Int32ub,
     Construct,
     Adapter,
     GreedyBytes,
-    PrefixedArray,
 )
 
 # ============================================================================
@@ -34,9 +31,257 @@ LVClusterType: TypeAlias = Annotated[tuple, "LabVIEW Cluster"]
 # ============================================================================
 
 
+class ArrayNDAdapter(Adapter):
+    """
+    Adapter for LabVIEW N-Dimensional Array type with auto-dimension detection.
+    
+    This adapter handles all array dimensions (1D, 2D, 3D, etc.) automatically.
+    
+    LabVIEW Array Format:
+        [dim0 (I32)] [dim1 (I32)] ... [dimN-1 (I32)] [elements...]
+        
+    The dimensions are read until: prod(dims) * element_size == remaining_bytes
+    
+    For 1D arrays:
+        Format: [num_elements (I32)] [elements...]
+        Example: [1, 2, 3] -> 0000 0003 0000 0001 0000 0002 0000 0003
+    
+    For ND arrays (2D, 3D, etc.):
+        Format: [dim0 (I32)] [dim1 (I32)] ... [elements...]
+        Example 2D (2×3): 0000 0002 0000 0003 [6 elements]
+        Example 3D (2×4×4): 0000 0002 0000 0004 0000 0004 [32 elements]
+    
+    Elements are stored in row-major order (C-style).
+    
+    The dimension detection works as follows:
+    - When building: Analyzes the nested list structure to determine dimensions
+    - When parsing: Reads dimensions until prod(dims) * element_size == remaining_bytes
+    """
+    
+    def __init__(self, element_type: Construct):
+        """
+        Initialize ArrayND adapter.
+        
+        Args:
+            element_type: Construct type for array elements
+        """
+        self.element_type = element_type
+        super().__init__(GreedyBytes)
+    
+    def _decode(self, obj: bytes, context, path) -> List:
+        """Convert bytes to Python list (1D) or nested list (ND)."""
+        import io
+        import math
+        
+        if len(obj) == 0:
+            return []
+        
+        # Get element size - required for dimension detection
+        element_size = None
+        try:
+            element_size = self.element_type.sizeof()
+        except (TypeError, AttributeError):
+            # Variable size element - fall back to simple 1D parsing
+            pass
+        
+        if element_size is None:
+            # Can't determine dimensions without knowing element size
+            # Fall back to simple 1D array parsing
+            stream = io.BytesIO(obj)
+            count = Int32ub.parse_stream(stream)
+            if count == 0:
+                return []
+            elements = []
+            for _ in range(count):
+                element = self.element_type.parse_stream(stream)
+                elements.append(element)
+            return elements
+        
+        # Read dimensions until prod(dims) * element_size == remaining_bytes
+        # This is the LabVIEW format for ND arrays
+        dims = []
+        offset = 0
+        total_bytes = len(obj)
+        
+        while offset < total_bytes:
+            # Read potential next dimension
+            if offset + 4 > total_bytes:
+                break
+            
+            next_dim = int.from_bytes(obj[offset:offset+4], 'big')
+            potential_dims = dims + [next_dim]
+            
+            # Calculate product of dimensions
+            prod = math.prod(potential_dims) if potential_dims else 0
+            
+            # Calculate remaining bytes after reading this dimension
+            remaining_after = total_bytes - (offset + 4)
+            
+            # Check if prod * element_size matches remaining bytes
+            if prod * element_size == remaining_after:
+                # Found the correct number of dimensions!
+                dims = potential_dims
+                offset += 4
+                break
+            elif prod * element_size > remaining_after:
+                # Too many elements, stop here
+                break
+            else:
+                # Not enough elements yet, add this dimension and continue
+                dims = potential_dims
+                offset += 4
+        
+        if not dims:
+            # No valid dimensions found, return empty
+            return []
+        
+        # Parse elements
+        stream = io.BytesIO(obj[offset:])
+        total_elements = math.prod(dims)
+        elements = []
+        for _ in range(total_elements):
+            element = self.element_type.parse_stream(stream)
+            elements.append(element)
+        
+        # Reshape to nested list based on dimensions
+        if len(dims) == 1:
+            return elements
+        else:
+            return self._reshape_to_nested_list(elements, dims)
+    
+    def _encode(self, obj: List, context, path) -> bytes:
+        """Convert Python list or nested list to bytes."""
+        import io
+        stream = io.BytesIO()
+        
+        if not obj:
+            # Empty array
+            stream.write(Int32ub.build(0))
+            return stream.getvalue()
+        
+        # Determine dimensions from the nested list
+        dims = self._get_dimensions(obj)
+        
+        # Write all dimension sizes (no num_dims header in LabVIEW format)
+        for dim_size in dims:
+            stream.write(Int32ub.build(dim_size))
+        
+        # Flatten and write elements in row-major order
+        flat_elements = self._flatten_nested_list(obj)
+        for element in flat_elements:
+            stream.write(self.element_type.build(element))
+        
+        return stream.getvalue()
+    
+    def _get_dimensions(self, obj: List) -> List[int]:
+        """Get dimensions of a list or nested list."""
+        dims = []
+        current = obj
+        while isinstance(current, list):
+            dims.append(len(current))
+            if len(current) > 0:
+                current = current[0]
+            else:
+                break
+        return dims
+    
+    def _flatten_nested_list(self, obj: List) -> List:
+        """Flatten a nested list to 1D in row-major order."""
+        flat = []
+        if not isinstance(obj, list):
+            return [obj]
+        for item in obj:
+            if isinstance(item, list):
+                flat.extend(self._flatten_nested_list(item))
+            else:
+                flat.append(item)
+        return flat
+    
+    def _reshape_to_nested_list(self, flat: List, dims: List[int]) -> List:
+        """Reshape a flat list to nested list based on dimensions."""
+        if len(dims) == 0:
+            return flat
+        if len(dims) == 1:
+            return flat[:dims[0]]
+        
+        # Calculate size of sub-arrays
+        sub_size = 1
+        for d in dims[1:]:
+            sub_size *= d
+        
+        result = []
+        for i in range(dims[0]):
+            start = i * sub_size
+            end = start + sub_size
+            sub_list = self._reshape_to_nested_list(flat[start:end], dims[1:])
+            result.append(sub_list)
+        
+        return result
+    
+    def _create_empty_nested_list(self, dims: List[int]) -> List:
+        """Create an empty nested list structure based on dimensions."""
+        if len(dims) == 0:
+            return []
+        if len(dims) == 1:
+            return [None] * dims[0] if dims[0] > 0 else []
+        
+        result = []
+        for _ in range(dims[0]):
+            result.append(self._create_empty_nested_list(dims[1:]))
+        return result
+
+
 def LVArray(element_type):
-    # Adapter non nécessaire ici, PrefixedArray suffit pour 1D
-    return PrefixedArray(Int32ub, element_type)
+    """
+    Create a LabVIEW Array construct with automatic dimension detection.
+    
+    This is a universal array type that handles 1D, 2D, 3D, and higher 
+    dimensional arrays automatically based on the data structure.
+    
+    LabVIEW Array Format:
+        [dim0 (I32)] [dim1 (I32)] ... [dimN-1 (I32)] [elements...]
+        
+    Dimensions are detected by reading until: prod(dims) * element_size == remaining_bytes
+    
+    Args:
+        element_type: Construct type for array elements
+    
+    Returns:
+        Construct that can serialize/deserialize arrays of any dimension
+    
+    Examples:
+        1D Array:
+        >>> from src import LVArray, LVI32
+        >>> arr = LVArray(LVI32)
+        >>> data = arr.build([1, 2, 3])
+        >>> print(data.hex())
+        00000003000000010000000200000003
+        >>> arr.parse(data)
+        [1, 2, 3]
+        
+        2D Array (2×3):
+        >>> arr = LVArray(LVI32)
+        >>> data = arr.build([[1, 2, 3], [4, 5, 6]])
+        >>> print(data.hex())
+        0000000200000003000000010000000200000003000000040000000500000006
+        >>> arr.parse(data)
+        [[1, 2, 3], [4, 5, 6]]
+        
+        3D Array (2×4×4):
+        >>> arr = LVArray(LVI32)
+        >>> data_3d = [[[7,0,0,0], [8,0,0,0], [0,0,3,0], [0,0,0,5]],
+        ...            [[0,0,0,0], [0,0,0,0], [0,0,0,6], [0,0,0,0]]]
+        >>> serialized = arr.build(data_3d)
+        >>> print(serialized[:12].hex())  # First 3 dimension values
+        000000020000000400000004
+    """
+    return ArrayNDAdapter(element_type)
+
+
+# Aliases for backwards compatibility and explicit usage
+LVArray1D = LVArray
+LVArray2D = LVArray
+LVArrayND = LVArray
 
 
 # ============================================================================
