@@ -103,7 +103,7 @@ def lvclass(library: str = "", class_name: Optional[str] = None,
             for base in inspect.getmro(self.__class__):
                 if hasattr(base, '__is_lv_class__') and base.__is_lv_class__:
                     inheritance_chain.append(base)
-            
+
             # Reverse to go from root to derived
             inheritance_chain.reverse()
             
@@ -112,7 +112,7 @@ def lvclass(library: str = "", class_name: Optional[str] = None,
             # Collect versions for all levels
             versions = []
             for level_class in inheritance_chain:
-                versions.append(level_class.__lv_version__)
+                versions.insert(0,level_class.__lv_version__)
             
             # Build cluster data for each level
             # The decorator extracts type hints and values, Object.py does the serialization
@@ -120,13 +120,12 @@ def lvclass(library: str = "", class_name: Optional[str] = None,
             for i, level_class in enumerate(inheritance_chain):
                 # Get type hints for this specific level
                 level_hints = level_class.__annotations__ if hasattr(level_class, '__annotations__') else {}
-                
                 # Extract values that exist on this instance
                 level_values = {}
                 for attr_name in level_hints.keys():
                     if hasattr(self, attr_name):
                         level_values[attr_name] = getattr(self, attr_name)
-                
+
                 # Let Object.py handle the serialization
                 # This also handles the case where if ANY type hint has a value,
                 # ALL type hints are serialized with defaults

@@ -34,12 +34,14 @@ class Test:
     dbl: LVDouble
     string: LVString
     u8_array: LVArray(LVU8)
+    str_array: LVArray(LVString)
 
 test = Test()
 #test.int32 = 614
 #test.dbl = 1.618
 test.string = "Había uña vez..."
 #test.u8_array = [123, 234, 45, 67, 89]
+test.str_array = ["Hello", "World", "from", "LabVIEW"]
 
 bytes = lvflatten(test)
 

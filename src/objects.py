@@ -398,7 +398,7 @@ def serialize_type_hints(type_hints: dict, values: dict) -> bytes:
         LVI32, LVU32, LVI16, LVU16, LVI8, LVU8, LVI64, LVU64,
         LVString, LVBoolean, LVDouble, LVSingle
     )
-    from .compound_types import ArrayNDAdapter
+    from .compound_types import ArrayAdapter
     import io
     
     if not type_hints:
@@ -430,7 +430,7 @@ def serialize_type_hints(type_hints: dict, values: dict) -> bytes:
                     value = 0
                 elif attr_type in (LVDouble, LVSingle):
                     value = 0.0
-                elif isinstance(attr_type, ArrayNDAdapter):
+                elif isinstance(attr_type, ArrayAdapter):
                     # LVArray, LVArray1D, LVArray2D, LVArrayND - default to empty list
                     value = []
                 else:

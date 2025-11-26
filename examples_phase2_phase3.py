@@ -7,7 +7,7 @@ This script shows how to use compound types (Arrays, Clusters) and Objects.
 
 from src import (
     LVI32, LVU16, LVString,
-    LVArray1D, LVArray2D, LVCluster,
+    LVArray, LVCluster,
     LVObject, create_empty_lvobject, create_lvobject,
 )
 
@@ -28,7 +28,7 @@ def main():
     print_section("Array 1D - Homogeneous Collections")
     
     # Array of I32
-    array_construct = LVArray1D(LVI32)
+    array_construct = LVArray(LVI32)
     data = [1, 2, 3]
     serialized = array_construct.build(data)
     print(f"Array 1D [1, 2, 3]:")
@@ -43,7 +43,7 @@ def main():
     
     # Array of strings
     print("\nArray 1D of strings:")
-    string_array = LVArray1D(LVString)
+    string_array = LVArray(LVString)
     data = ["Hello", "World", "Test"]
     serialized = string_array.build(data)
     print(f"  Data: {data}")
@@ -57,7 +57,7 @@ def main():
     print_section("Array 2D - Multi-dimensional Arrays")
     
     # 2×3 matrix
-    array2d_construct = LVArray2D(LVI32)
+    array2d_construct = LVArray(LVI32)
     data = [[1, 2, 3], [4, 5, 6]]
     serialized = array2d_construct.build(data)
     print(f"Array 2D (2×3 matrix):")

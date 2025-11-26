@@ -31,7 +31,7 @@ LVClusterType: TypeAlias = Annotated[tuple, "LabVIEW Cluster"]
 # ============================================================================
 
 
-class ArrayNDAdapter(Adapter):
+class ArrayAdapter(Adapter):
     """
     Adapter for LabVIEW N-Dimensional Array type with auto-dimension detection.
     
@@ -275,13 +275,7 @@ def LVArray(element_type):
         >>> print(serialized[:12].hex())  # First 3 dimension values
         000000020000000400000004
     """
-    return ArrayNDAdapter(element_type)
-
-
-# Aliases for backwards compatibility and explicit usage
-LVArray1D = LVArray
-LVArray2D = LVArray
-LVArrayND = LVArray
+    return ArrayAdapter(element_type)
 
 
 # ============================================================================
