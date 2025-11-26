@@ -38,7 +38,7 @@ def test_lvclass_decorator_defaults():
     
     assert MyClass.__lv_library__ == ""  # Default is empty string, not class name
     assert MyClass.__lv_class_name__ == "MyClass"  # Class name defaults to Python class name
-    assert MyClass.__lv_version__ == (1, 0, 0, 0)
+    assert MyClass.__lv_version__ == (1, 0, 0, 1)
 
 
 def test_lvclass_creates_to_lvobject_method():

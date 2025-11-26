@@ -18,7 +18,7 @@ from .compound_types import LVCluster
 
 
 def lvclass(library: str = "", class_name: Optional[str] = None, 
-            version: tuple = (1, 0, 0, 0)):
+            version: tuple = (1, 0, 0, 1)):
     """
     Decorator to mark a Python class as a LabVIEW Object.
     
@@ -78,7 +78,6 @@ def lvclass(library: str = "", class_name: Optional[str] = None,
         cls.__lv_class_name__ = class_name if class_name else cls.__name__
         cls.__lv_version__ = version
         cls.__is_lv_class__ = True
-        
         # Add a method to serialize the instance
         original_init = cls.__init__ if hasattr(cls, '__init__') else None
         

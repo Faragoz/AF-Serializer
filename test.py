@@ -43,9 +43,29 @@ test.string = "Había uña vez..."
 #test.u8_array = [123, 234, 45, 67, 89]
 test.str_array = ["Hello", "World", "from", "LabVIEW"]
 
+
 bytes = lvflatten(test)
-
+lvobj_dict = lvunflatten(bytes, LVObject())
 print(bytes.hex())
+"""print(test)
+print(bytes.hex())
+print(lvobj_dict)"""
 
-#lvobj_dict = lvunflatten(bytes, LVObject())
-#print(lvobj_dict)
+from src import LVObject, create_lvobject
+
+obj_construct = LVObject()
+# Using old API for backwards compat - it will use the LAST class name
+data = create_lvobject(
+    class_names=[
+        "Actor Framework.lvlib:Message.lvclass",
+        "Serializable Message.lvlib:Serializable Msg.lvclass",
+        "Commander.lvlib:echo general Msg.lvclass"
+    ],
+    versions=[(1, 0, 0, 0), (1, 0, 0, 7), (1, 0, 0, 0)],  # Use tuple format
+    cluster_data=[b'', b'', b'']
+)
+
+serialized = obj_construct.build(data)
+print(serialized.hex())
+"""deserialized = obj_construct.parse(serialized)
+print(deserialized)"""

@@ -10,7 +10,7 @@ from construct import ConstructError
 
 from src import (
     LVI32, LVU16, LVString,
-    LVArray, LVArray1D, LVArray2D, LVCluster,
+    LVArray, LVCluster,
 )
 
 
@@ -22,7 +22,7 @@ def test_array1d_serialization_three_elements():
     """Validate Array1D serialization against real LabVIEW hex output."""
     # Array of 3 I32 elements: [1, 2, 3]
     # Expected: 0000 0003 0000 0001 0000 0002 0000 0003
-    array_construct = LVArray1D(LVI32)
+    array_construct = LVArray(LVI32)
     data = [1, 2, 3]
     expected_hex = "00000003000000010000000200000003"
     
@@ -33,7 +33,7 @@ def test_array1d_serialization_three_elements():
 
 def test_array1d_deserialization_roundtrip():
     """Test Array1D serialize → deserialize → compare."""
-    array_construct = LVArray1D(LVI32)
+    array_construct = LVArray(LVI32)
     original = [1, 2, 3]
     
     serialized = array_construct.build(original)
@@ -44,7 +44,7 @@ def test_array1d_deserialization_roundtrip():
 
 def test_array1d_empty_array():
     """Test Array1D with empty array."""
-    array_construct = LVArray1D(LVI32)
+    array_construct = LVArray(LVI32)
     data = []
     expected_hex = "00000000"
     
@@ -55,7 +55,7 @@ def test_array1d_empty_array():
 
 def test_array1d_single_element():
     """Test Array1D with single element."""
-    array_construct = LVArray1D(LVI32)
+    array_construct = LVArray(LVI32)
     data = [42]
     expected_hex = "000000010000002a"
     
@@ -73,7 +73,7 @@ def test_array1d_single_element():
 ])
 def test_array1d_roundtrip_parametrized(data):
     """Test Array1D roundtrip with various data."""
-    array_construct = LVArray1D(LVI32)
+    array_construct = LVArray(LVI32)
     
     serialized = array_construct.build(data)
     deserialized = array_construct.parse(serialized)
@@ -89,7 +89,7 @@ def test_array2d_serialization_2x3_matrix():
     """Validate Array2D serialization for 2×3 matrix."""
     # 2×3 matrix: [[1, 2, 3], [4, 5, 6]]
     # Format: [dim0=2 (I32)] [dim1=3 (I32)] [6 elements]
-    array_construct = LVArray2D(LVI32)
+    array_construct = LVArray(LVI32)
     data = [[1, 2, 3], [4, 5, 6]]
     
     result = array_construct.build(data)
@@ -109,7 +109,7 @@ def test_array2d_serialization_2x3_matrix():
 
 def test_array2d_deserialization_roundtrip():
     """Test Array2D serialize → deserialize → compare."""
-    array_construct = LVArray2D(LVI32)
+    array_construct = LVArray(LVI32)
     original = [[1, 2, 3], [4, 5, 6]]
     
     serialized = array_construct.build(original)
@@ -120,7 +120,7 @@ def test_array2d_deserialization_roundtrip():
 
 def test_array2d_single_row():
     """Test Array2D with single row."""
-    array_construct = LVArray2D(LVI32)
+    array_construct = LVArray(LVI32)
     data = [[1, 2, 3]]
     
     serialized = array_construct.build(data)
@@ -136,7 +136,7 @@ def test_array2d_single_row():
 ])
 def test_array2d_roundtrip_parametrized(data):
     """Test Array2D roundtrip with various data."""
-    array_construct = LVArray2D(LVI32)
+    array_construct = LVArray(LVI32)
     
     serialized = array_construct.build(data)
     deserialized = array_construct.parse(serialized)
@@ -311,7 +311,7 @@ def test_nested_array_in_cluster():
     """Test Cluster containing an array."""
     # This is more complex - cluster with array as one element
     # For now, we test that arrays and clusters work independently
-    array_construct = LVArray1D(LVI32)
+    array_construct = LVArray(LVI32)
     array_data = [1, 2, 3]
     array_bytes = array_construct.build(array_data)
     
@@ -321,7 +321,7 @@ def test_nested_array_in_cluster():
 
 def test_array_of_strings():
     """Test Array1D with string elements."""
-    array_construct = LVArray1D(LVString)
+    array_construct = LVArray(LVString)
     data = ["Hello", "World", "Test"]
     
     serialized = array_construct.build(data)

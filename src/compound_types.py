@@ -15,7 +15,7 @@ from construct import (
     Int32ub,
     Construct,
     Adapter,
-    GreedyBytes,
+    GreedyBytes, SizeofError,
 )
 
 # ============================================================================
@@ -80,7 +80,7 @@ class ArrayAdapter(Adapter):
         element_size = None
         try:
             element_size = self.element_type.sizeof()
-        except (TypeError, AttributeError):
+        except (TypeError, AttributeError, SizeofError):
             # Variable size element - fall back to simple 1D parsing
             pass
         

@@ -181,6 +181,7 @@ def test_lvobject_three_level_class_names():
     
     serialized = obj_construct.build(data)
     deserialized = obj_construct.parse(serialized)
+    print(deserialized)
     
     # Verify correct structure per LabVIEW spec
     assert deserialized["num_levels"] == 3  # 3 levels of inheritance

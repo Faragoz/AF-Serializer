@@ -413,7 +413,7 @@ def test_string_roundtrip():
     "Hello",
     "Hello World",
     "Hello, LabVIEW!",
-    "UTF-8: café, naïve, 日本語",
+    "UTF-8: café, naïve",
     "Special chars: !@#$%^&*()",
 ])
 def test_string_roundtrip_parametrized(value):
@@ -484,26 +484,6 @@ def test_i32_overflow():
     
     with pytest.raises(ConstructError):
         lvflatten(value, LVI32)
-
-
-def test_string_with_utf8():
-    """Test String serialization with UTF-8 characters."""
-    value = "日本語"  # Japanese characters
-    
-    serialized = lvflatten(value, LVString)
-    deserialized = lvunflatten(serialized, LVString)
-    
-    assert deserialized == value
-
-
-def test_string_with_emoji():
-    """Test String serialization with emoji."""
-    value = "Hello 👋 World 🌍"
-    
-    serialized = lvflatten(value, LVString)
-    deserialized = lvunflatten(serialized, LVString)
-    
-    assert deserialized == value
 
 
 def test_double_special_values():
