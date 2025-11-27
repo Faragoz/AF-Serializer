@@ -146,7 +146,7 @@ def main():
     result = lvunflatten(data, LVBoolean)
     print(f"  {data.hex()} -> {result}")
     
-    print("\n❌ Invalid Boolean (0x02) - will raise ValidationError:")
+    print("\nInvalid Boolean (0x02) - will raise ValidationError:")
     try:
         data = bytes.fromhex("02")
         result = lvunflatten(data, LVBoolean)

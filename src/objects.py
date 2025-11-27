@@ -137,6 +137,7 @@ class LVObjectAdapter(Adapter):
         # Read ClassName section (ONLY the most derived class)
         # Format: total_length + Pascal strings + end marker (0x00)
         total_length = Int8ub.parse(stream.read(1))
+        print(f"Debug: ClassName total length = {total_length}")
         
         # Read Pascal strings until we hit end marker (length = 0)
         pascal_strings = []
@@ -150,7 +151,7 @@ class LVObjectAdapter(Adapter):
                 # End marker found
                 break
             
-            str_data = stream.read(str_length).decode('utf-8')
+            str_data = stream.read(str_length).decode('mbcs')
             bytes_read_in_section += str_length
             pascal_strings.append(str_data)
         
@@ -177,14 +178,23 @@ class LVObjectAdapter(Adapter):
         padding_needed = _calculate_padding(bytes_read)
         if padding_needed > 0:
             stream.read(padding_needed)
+
         
         # Always read VersionList (8 bytes per level: 4 x I16)
         # Use declarative VersionStruct for clean parsing
+        peek = stream.read(1)
         versions = []
-        for _ in range(num_levels):
-            version_dict = VersionStruct.parse_stream(stream)
-            # Convert to tuple for consistency
-            versions.append((version_dict.major, version_dict.minor, version_dict.patch, version_dict.build))
+        if peek == b'\x00':
+            # Pas de VersionList, valeurs par défaut pour tous les niveaux
+            versions = [(0, 0, 0, 0)] * num_levels
+            # Avancer le curseur pour garder l’alignement
+            stream.read(8 * num_levels - 1)
+        else:
+            # VersionList présent, revenir en arrière
+            stream.seek(-1, 1)
+            for _ in range(num_levels):
+                version_dict = VersionStruct.parse_stream(stream)
+                versions.append((version_dict.major, version_dict.minor, version_dict.patch, version_dict.build))
         
         # Try to read ClusterData for each level
         # Format: size (I32) + data
@@ -257,8 +267,8 @@ class LVObjectAdapter(Adapter):
         # When library is absent: class_len + class + 0x00
         total_length = 0
         if library:
-            total_length += 1 + len(library.encode('utf-8'))  # Length byte + library
-        total_length += 1 + len(classname.encode('utf-8'))  # Length byte + class
+            total_length += 1 + len(library.encode('mbcs'))  # Length byte + library
+        total_length += 1 + len(classname.encode('mbcs'))  # Length byte + class
         total_length += 1  # End marker
         
         # Write total length
@@ -267,12 +277,12 @@ class LVObjectAdapter(Adapter):
         # Write the most derived class name only
         # Write library (Pascal string) only if present
         if library:
-            lib_bytes = library.encode('utf-8')
+            lib_bytes = library.encode('mbcs')
             stream.write(Int8ub.build(len(lib_bytes)))
             stream.write(lib_bytes)
         
         # Write class name (Pascal string)
-        class_bytes = classname.encode('utf-8')
+        class_bytes = classname.encode('mbcs')
         stream.write(Int8ub.build(len(class_bytes)))
         stream.write(class_bytes)
         

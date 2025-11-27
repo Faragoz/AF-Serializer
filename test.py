@@ -43,13 +43,13 @@ test.string = "Había uña vez..."
 #test.u8_array = [123, 234, 45, 67, 89]
 test.str_array = ["Hello", "World", "from", "LabVIEW"]
 
+"""bytes = lvflatten(test)
 
-bytes = lvflatten(test)
+print(test)
 lvobj_dict = lvunflatten(bytes, LVObject())
-print(bytes.hex())
-"""print(test)
-print(bytes.hex())
 print(lvobj_dict)"""
+
+print("--- Creating LVObject with old API ---")
 
 from src import LVObject, create_lvobject
 
@@ -66,6 +66,6 @@ data = create_lvobject(
 )
 
 serialized = obj_construct.build(data)
-print(serialized.hex())
-"""deserialized = obj_construct.parse(serialized)
-print(deserialized)"""
+#print(serialized.hex())
+deserialized = obj_construct.parse(serialized)
+print(deserialized)

@@ -193,15 +193,21 @@ def test_lvobject_three_level_class_names():
 
 def test_lvobject_versions():
     """Test that version information is preserved."""
+    cluster_construct = LVCluster(LVString, LVU16)
+    cluster_data_3 = ("Hello World", 0)
+    cluster_bytes_3 = cluster_construct.build(cluster_data_3)
+
     obj_construct = LVObject()
     data = create_lvobject(
         class_names=["Test.lvlib:Test.lvclass"],
         versions=[(1, 2, 3, 4)],  # Version 1.2.3.4 in tuple format
-        cluster_data=[b'']
+        cluster_data=[cluster_bytes_3]
     )
     
     serialized = obj_construct.build(data)
+    print(serialized)
     deserialized = obj_construct.parse(serialized)
+    print(deserialized)
     
     assert deserialized["versions"][0] == (1, 2, 3, 4)
 
@@ -278,7 +284,7 @@ def test_lvobject_multiple_versions():
             "Derived.lvlib:Derived.lvclass"
         ],
         versions=[(1, 0, 0, 0), (2, 0, 0, 5)],  # Different versions in tuple format
-        cluster_data=[b'', b'']
+        cluster_data=[b'\x00\x01', b'\x00\x02']
     )
     
     serialized = obj_construct.build(obj)
