@@ -102,29 +102,40 @@ is treated as True, not just 0x01. This is standard boolean behavior.
 # String Type (Pascal String with Int32ub Prefix)
 # ============================================================================
 
+def _get_string_encoding():
+    """
+    Get the appropriate encoding for LabVIEW strings.
+    Uses 'mbcs' on Windows, 'latin-1' on other platforms.
+    """
+    import sys
+    if sys.platform == 'win32':
+        return 'mbcs'
+    return 'latin-1'
+
+
 class PascalMBCSAdapter(Adapter):
-    def __init__(self, encoding="mbcs"):
+    def __init__(self):
         super().__init__(Struct(
             "length" / Int32ub,
             "data" / Bytes(this.length)
         ))
-        self.encoding = encoding
 
     def _encode(self, obj, context, path):
-        raw = obj.encode(self.encoding)
+        encoding = _get_string_encoding()
+        raw = obj.encode(encoding)
         return {"length": len(raw), "data": raw}
 
     def _decode(self, obj, context, path):
-        return obj.data.decode(self.encoding)
+        encoding = _get_string_encoding()
+        return obj.data.decode(encoding)
 
 LVString = PascalMBCSAdapter()
-#LVString = PascalString(Int32ub, "utf-8")
 """
-LabVIEW String: Pascal String with Int32ub length prefix + MBCS encoding.
+LabVIEW String: Pascal String with Int32ub length prefix.
 
-Uses Construct's built-in Adapter for clean, declarative definition.
+Uses 'mbcs' encoding on Windows, 'latin-1' on other platforms for compatibility.
 
-Format: [length (I32)] + [MBCS bytes]
+Format: [length (I32)] + [bytes]
 Example: "Hello" -> 00000005 48656C6C6F
 """
 
