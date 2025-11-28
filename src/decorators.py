@@ -5,7 +5,7 @@ This module provides decorators to easily convert Python classes to LabVIEW Obje
 making it simpler to work with the construct_impl serialization system.
 """
 
-from typing import Optional, Any, List, get_type_hints
+from typing import Optional, Any, List, get_type_hints, Type
 from functools import wraps
 import inspect
 
@@ -15,6 +15,30 @@ from .basic_types import (
     LVString, LVBoolean, LVDouble, LVSingle
 )
 from .compound_types import LVCluster
+
+
+# ============================================================================
+# Class Registry for @lvclass decorated classes
+# ============================================================================
+
+_LVCLASS_REGISTRY: dict[str, Type] = {}
+"""
+Registry to track all @lvclass decorated classes by their LabVIEW names.
+Format: "Library.lvlib:ClassName.lvclass" → class reference
+"""
+
+
+def get_lvclass_by_name(full_name: str) -> Optional[Type]:
+    """
+    Lookup a class in the registry by its full LabVIEW name.
+    
+    Args:
+        full_name: Full LabVIEW class name (e.g., "Library.lvlib:ClassName.lvclass")
+    
+    Returns:
+        The class reference if found, None otherwise
+    """
+    return _LVCLASS_REGISTRY.get(full_name)
 
 
 def lvclass(library: str = "", class_name: Optional[str] = None, 
@@ -158,6 +182,63 @@ def lvclass(library: str = "", class_name: Optional[str] = None,
             return obj_construct.build(self.to_lvobject())
         
         cls.to_bytes = to_bytes
+        
+        # Add a classmethod to create instance from LVObject dict
+        @classmethod
+        def from_lvobject(target_cls, lvobj_dict: dict) -> Any:
+            """
+            Create an instance from a LabVIEW Object dictionary.
+            
+            Deserializes cluster_data for each inheritance level and
+            populates type hints on the new instance.
+            
+            Args:
+                lvobj_dict: Dictionary from LVObject parsing
+            
+            Returns:
+                Populated instance of this class
+            """
+            from .objects import deserialize_type_hints
+            
+            # Create a new instance
+            instance = target_cls.__new__(target_cls)
+            
+            # Walk up the inheritance chain to find all @lvclass decorated base classes
+            inheritance_chain = []
+            for base in inspect.getmro(target_cls):
+                if hasattr(base, '__is_lv_class__') and base.__is_lv_class__:
+                    inheritance_chain.append(base)
+            
+            # Reverse to go from root to derived
+            inheritance_chain.reverse()
+            
+            cluster_data = lvobj_dict.get("cluster_data", [])
+            
+            # For each level, deserialize cluster_data and set attributes
+            for i, level_class in enumerate(inheritance_chain):
+                # Get type hints for this specific level
+                level_hints = level_class.__annotations__ if hasattr(level_class, '__annotations__') else {}
+                
+                if not level_hints:
+                    continue
+                
+                # Get cluster bytes for this level (if available)
+                if i < len(cluster_data):
+                    cluster_bytes = cluster_data[i]
+                    if isinstance(cluster_bytes, bytes) and len(cluster_bytes) > 0:
+                        # Deserialize the cluster bytes to a dict
+                        values = deserialize_type_hints(level_hints, cluster_bytes)
+                        # Set attributes on instance
+                        for attr_name, value in values.items():
+                            setattr(instance, attr_name, value)
+            
+            return instance
+        
+        cls.from_lvobject = from_lvobject
+        
+        # Register this class in the global registry
+        full_lv_name = f"{cls.__lv_library__}.lvlib:{cls.__lv_class_name__}.lvclass" if cls.__lv_library__ else f"{cls.__lv_class_name__}.lvclass"
+        _LVCLASS_REGISTRY[full_lv_name] = cls
         
         return cls
     

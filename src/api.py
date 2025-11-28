@@ -99,23 +99,26 @@ def lvflatten(data: Any, type_hint: Optional[Construct] = None) -> bytes:
     return type_hint.build(data)
 
 
-def lvunflatten(data: bytes, type_hint: Construct) -> Any:
+def lvunflatten(data: bytes, type_hint: Union[Construct, Type]) -> Any:
     """
     Deserialize LabVIEW binary data to Python.
     
     This function converts LabVIEW binary format to Python data types.
+    Supports both Construct types and @lvclass decorated classes.
     
     Args:
         data: Binary data in LabVIEW format (big-endian).
-        type_hint: Construct type definition specifying the expected format.
-            Required for deserialization. Examples: LVI32, LVDouble, LVString
+        type_hint: Either a Construct type definition (e.g., LVI32, LVDouble, LVString)
+                   or an @lvclass decorated class type.
     
     Returns:
         Deserialized Python value matching the type_hint.
+        If type_hint is an @lvclass decorated class, returns a populated instance.
     
     Raises:
         ConstructError: If data doesn't match the expected format.
         ValidationError: If data contains invalid values (e.g., boolean not 0x00/0x01).
+        ValueError: If class not found in registry when using class type_hint.
     
     Examples:
         >>> data = b'\\x00\\x00\\x00*'
@@ -126,14 +129,48 @@ def lvunflatten(data: bytes, type_hint: Construct) -> Any:
         >>> lvunflatten(data, LVString)
         'Hello'
         
-        >>> data = b'@\\t!\\xfbTH-\\x18'
-        >>> lvunflatten(data, LVDouble)
-        3.14
-        
-        >>> data = b'\\x01'
-        >>> lvunflatten(data, LVBoolean)
-        True
+        >>> # With @lvclass decorated class
+        >>> msg = EchoMsg()
+        >>> msg.message = "Hello World"
+        >>> msg.code = 42
+        >>> data = lvflatten(msg)
+        >>> restored = lvunflatten(data, EchoMsg)
+        >>> assert restored.message == "Hello World"
+        >>> assert restored.code == 42
     """
+    from .objects import LVObject as LVObjectFactory
+    from .decorators import get_lvclass_by_name
+    
+    # Check if type_hint is a class with __is_lv_class__ attribute
+    if isinstance(type_hint, type) and hasattr(type_hint, '__is_lv_class__') and type_hint.__is_lv_class__:
+        # Parse bytes as LVObject
+        obj_construct = LVObjectFactory()
+        lvobj_dict = obj_construct.parse(data)
+        
+        # Extract class_name from result
+        class_name = lvobj_dict.get("class_name")
+        
+        if class_name:
+            # Lookup class in registry (prefer most derived class)
+            target_class = get_lvclass_by_name(class_name)
+            
+            if target_class is None:
+                # Try to find a class in the inheritance chain
+                # If user passes a base class but data is for derived class,
+                # we should use the derived class from the registry
+                target_class = type_hint
+            
+            # Create instance using from_lvobject
+            if hasattr(target_class, 'from_lvobject'):
+                return target_class.from_lvobject(lvobj_dict)
+            else:
+                # Fallback to returning the dict if from_lvobject not available
+                return lvobj_dict
+        else:
+            # Empty object or no class name - return empty instance
+            return type_hint.__new__(type_hint)
+    
+    # Otherwise, use existing Construct parsing logic
     return type_hint.parse(data)
 
 

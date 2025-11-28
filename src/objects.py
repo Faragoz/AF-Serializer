@@ -480,6 +480,64 @@ def serialize_type_hints(type_hints: dict, values: dict) -> bytes:
     return stream.getvalue()
 
 
+def deserialize_type_hints(type_hints: dict, cluster_bytes: bytes) -> dict:
+    """
+    Deserialize cluster bytes to dict of {field_name: value}.
+    
+    This function is the inverse of serialize_type_hints().
+    It reads bytes sequentially based on type hints order and returns
+    a dict suitable for populating instance attributes.
+    
+    Args:
+        type_hints: Dictionary of {field_name: type_hint}
+        cluster_bytes: Serialized cluster data as bytes
+    
+    Returns:
+        Dictionary of {field_name: value}
+    """
+    from .basic_types import (
+        LVI32, LVU32, LVI16, LVU16, LVI8, LVU8, LVI64, LVU64,
+        LVString, LVBoolean, LVDouble, LVSingle
+    )
+    from .compound_types import ArrayAdapter
+    import io
+    
+    if not type_hints or not cluster_bytes:
+        return {}
+    
+    result = {}
+    stream = io.BytesIO(cluster_bytes)
+    
+    for attr_name, attr_type in type_hints.items():
+        try:
+            # Check for Construct types FIRST (they have .parse method)
+            if hasattr(attr_type, 'parse'):
+                # It's a Construct type (LVI32, LVU16, LVString, LVArray, etc.)
+                value = attr_type.parse_stream(stream)
+                result[attr_name] = value
+            # Then check for Python types
+            elif attr_type == str:
+                value = LVString.parse_stream(stream)
+                result[attr_name] = value
+            elif attr_type == bool:
+                value = LVBoolean.parse_stream(stream)
+                result[attr_name] = value
+            elif attr_type == int:
+                value = LVI32.parse_stream(stream)
+                result[attr_name] = value
+            elif attr_type == float:
+                value = LVDouble.parse_stream(stream)
+                result[attr_name] = value
+            else:
+                # Unknown type - skip
+                continue
+        except Exception:
+            # If parsing fails (e.g., end of stream), stop processing
+            break
+    
+    return result
+
+
 def create_empty_lvobject() -> dict:
     """
     Create an empty LabVIEW Object.

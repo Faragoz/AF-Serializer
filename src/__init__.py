@@ -88,8 +88,9 @@ from .decorators import (
     # Decorators
     lvclass,
     lvfield,
-    # Helper function
+    # Helper functions
     is_lvclass,
+    get_lvclass_by_name,
 )
 
 __all__ = [
@@ -130,6 +131,7 @@ __all__ = [
     "lvclass",
     "lvfield",
     "is_lvclass",
+    "get_lvclass_by_name",
 ]
 
 __version__ = "0.2.1"

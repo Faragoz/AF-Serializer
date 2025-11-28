@@ -10,6 +10,7 @@ import pytest
 from src import (
     lvfield, is_lvclass, lvflatten, lvunflatten,
     LVObject, LVI32, LVString, LVU16, lvclass,
+    get_lvclass_by_name,
 )
 
 
@@ -218,3 +219,94 @@ def test_lvflatten_integration():
     assert isinstance(data, bytes)
     # Verify it's a proper LVObject (single level = 1)
     assert data[:4].hex() == "00000001"  # NumLevels = 1
+
+
+# ============================================================================
+# Class Registry Tests
+# ============================================================================
+
+def test_lvclass_registered_in_registry():
+    """Test that @lvclass decorated classes are registered in the registry."""
+    from src import get_lvclass_by_name
+    
+    @lvclass(library="TestLib", class_name="RegistryTest")
+    class RegistryTest:
+        pass
+    
+    # Check class is registered
+    registered = get_lvclass_by_name("TestLib.lvlib:RegistryTest.lvclass")
+    assert registered is RegistryTest
+
+
+def test_lvclass_registry_without_library():
+    """Test registry works for classes without library."""
+    from src import get_lvclass_by_name
+    
+    @lvclass(class_name="NoLibClass")
+    class NoLibClass:
+        pass
+    
+    # Check class is registered without library prefix
+    registered = get_lvclass_by_name("NoLibClass.lvclass")
+    assert registered is NoLibClass
+
+
+def test_get_lvclass_by_name_not_found():
+    """Test that get_lvclass_by_name returns None for unknown classes."""
+    from src import get_lvclass_by_name
+    
+    result = get_lvclass_by_name("NonExistent.lvlib:NonExistent.lvclass")
+    assert result is None
+
+
+# ============================================================================
+# from_lvobject Method Tests
+# ============================================================================
+
+def test_lvclass_has_from_lvobject_method():
+    """Test that @lvclass adds from_lvobject classmethod."""
+    @lvclass(library="TestLib", class_name="FromLVObjectTest")
+    class FromLVObjectTest:
+        value: LVI32
+    
+    assert hasattr(FromLVObjectTest, 'from_lvobject')
+    assert callable(FromLVObjectTest.from_lvobject)
+
+
+def test_from_lvobject_creates_instance():
+    """Test that from_lvobject creates an instance of the class."""
+    @lvclass(library="TestLib", class_name="InstanceTest")
+    class InstanceTest:
+        pass
+    
+    # Create a minimal LVObject dict
+    lvobj_dict = {
+        "num_levels": 1,
+        "class_name": "TestLib.lvlib:InstanceTest.lvclass",
+        "versions": [(1, 0, 0, 1)],
+        "cluster_data": [b'']
+    }
+    
+    result = InstanceTest.from_lvobject(lvobj_dict)
+    assert isinstance(result, InstanceTest)
+
+
+# ============================================================================
+# lvunflatten with Class Type Tests
+# ============================================================================
+
+def test_lvunflatten_backwards_compatible_with_construct():
+    """Test lvunflatten still works with Construct types."""
+    # Test with LVI32
+    data = b'\x00\x00\x00\x2a'  # 42 in big-endian
+    result = lvunflatten(data, LVI32)
+    assert result == 42
+
+
+def test_lvunflatten_backwards_compatible_with_lvobject():
+    """Test lvunflatten still works with LVObject() construct."""
+    # Empty LVObject
+    data = b'\x00\x00\x00\x00'
+    result = lvunflatten(data, LVObject())
+    assert isinstance(result, dict)
+    assert result["num_levels"] == 0
