@@ -151,13 +151,17 @@ def lvunflatten(data: bytes, type_hint: Union[Construct, Type]) -> Any:
         class_name = lvobj_dict.get("class_name")
         
         if class_name:
-            # Lookup class in registry (prefer most derived class)
+            # Lookup class in registry to find the actual class that was serialized.
+            # This handles the case where user passes a base class (e.g., Message)
+            # but the data contains a derived class (e.g., EchoMsg).
             target_class = get_lvclass_by_name(class_name)
             
             if target_class is None:
-                # Try to find a class in the inheritance chain
-                # If user passes a base class but data is for derived class,
-                # we should use the derived class from the registry
+                # Class not found in registry. This can happen if:
+                # 1. The class was serialized by a different process/module
+                # 2. The class name in the data doesn't match any registered class
+                # Fall back to using the user-provided type_hint as it's the best
+                # available option and will still populate common inherited fields.
                 target_class = type_hint
             
             # Create instance using from_lvobject

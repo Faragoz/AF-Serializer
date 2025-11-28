@@ -500,6 +500,7 @@ def deserialize_type_hints(type_hints: dict, cluster_bytes: bytes) -> dict:
         LVString, LVBoolean, LVDouble, LVSingle
     )
     from .compound_types import ArrayAdapter
+    from construct import StreamError, ConstructError
     import io
     
     if not type_hints or not cluster_bytes:
@@ -528,11 +529,15 @@ def deserialize_type_hints(type_hints: dict, cluster_bytes: bytes) -> dict:
             elif attr_type == float:
                 value = LVDouble.parse_stream(stream)
                 result[attr_name] = value
-            else:
-                # Unknown type - skip
-                continue
-        except Exception:
-            # If parsing fails (e.g., end of stream), stop processing
+            # Note: Unknown types (e.g., custom classes, complex generics) are skipped.
+            # This is safe because:
+            # 1. serialize_type_hints() also skips unknown types during serialization
+            # 2. The type hint order is preserved, so we continue processing remaining fields
+        except (StreamError, ConstructError):
+            # Stream errors indicate we've reached the end of available data
+            # or the data doesn't match the expected format.
+            # This can happen with partial data or when cluster_data has fewer entries
+            # than expected. We stop processing and return what we have.
             break
     
     return result
