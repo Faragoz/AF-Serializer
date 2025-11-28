@@ -6,10 +6,12 @@ and enables automatic serialization.
 """
 
 import pytest
+import warnings
 
 from src import (
     lvfield, is_lvclass, lvflatten, lvunflatten,
     LVObject, LVI32, LVString, LVU16, lvclass,
+    get_lvclass_by_name, _LVCLASS_REGISTRY
 )
 
 
@@ -41,34 +43,25 @@ def test_lvclass_decorator_defaults():
     assert MyClass.__lv_version__ == (1, 0, 0, 1)
 
 
-def test_lvclass_creates_to_lvobject_method():
-    """Test that @lvclass adds to_lvobject() method."""
-    @lvclass(library="TestLib", class_name="TestClass")
-    class TestClass:
-        def __init__(self):
-            self.message = "Hello"
-            self.count = 42
+def test_lvclass_registers_in_registry():
+    """Test that @lvclass registers the class in the global registry."""
+    @lvclass(library="TestLib", class_name="RegistryTestClass")
+    class RegistryTestClass:
+        pass
     
-    obj = TestClass()
-    lvobj_dict = obj.to_lvobject()
-    
-    assert isinstance(lvobj_dict, dict)
-    assert lvobj_dict["num_levels"] == 1
-    assert "TestLib.lvlib:TestClass.lvclass" in lvobj_dict["class_name"]
+    full_name = "TestLib.lvlib:RegistryTestClass.lvclass"
+    assert full_name in _LVCLASS_REGISTRY
+    assert get_lvclass_by_name(full_name) is RegistryTestClass
 
 
-def test_lvclass_creates_to_bytes_method():
-    """Test that @lvclass adds to_bytes() method."""
-    @lvclass(library="TestLib", class_name="TestClass")
-    class TestClass:
-        def __init__(self):
-            self.value = 100
+def test_lvclass_registry_without_library():
+    """Test that @lvclass without library registers correctly."""
+    @lvclass(class_name="NoLibClass")
+    class NoLibClass:
+        pass
     
-    obj = TestClass()
-    data = obj.to_bytes()
-    
-    assert isinstance(data, bytes)
-    assert len(data) > 0
+    full_name = "NoLibClass.lvclass"
+    assert get_lvclass_by_name(full_name) is NoLibClass
 
 
 # ============================================================================
@@ -78,28 +71,28 @@ def test_lvclass_creates_to_bytes_method():
 def test_lvclass_with_multi_level_inheritance():
     """Test @lvclass with multiple inheritance levels."""
     # Create a proper inheritance chain
-    @lvclass(library="Actor Framework", class_name="Message")
-    class Message:
+    @lvclass(library="Actor Framework", class_name="InheritanceMessage")
+    class InheritanceMessage:
         pass
     
-    @lvclass(library="Serializable Message", class_name="Serializable Msg", version=(1, 0, 0, 7))
-    class SerializableMsg(Message):
+    @lvclass(library="Serializable Message", class_name="InheritanceSerializableMsg", version=(1, 0, 0, 7))
+    class InheritanceSerializableMsg(InheritanceMessage):
         pass
     
-    @lvclass(library="Commander", class_name="echo general Msg")
-    class EchoGeneralMsg(SerializableMsg):
-        def __init__(self):
-            self.message = "Hello World"
-            self.status = 0
+    @lvclass(library="Commander", class_name="InheritanceEchoMsg")
+    class InheritanceEchoMsg(InheritanceSerializableMsg):
+        message: str
+        status: LVI32
     
-    obj = EchoGeneralMsg()
-    lvobj_dict = obj.to_lvobject()
+    obj = InheritanceEchoMsg()
+    obj.message = "Hello World"
+    obj.status = 0
+    
+    # Serialize and deserialize
+    data = lvflatten(obj)
     
     # Auto-detected 3 levels from inheritance chain
-    assert lvobj_dict["num_levels"] == 3
-    assert "Commander.lvlib:echo general Msg.lvclass" in lvobj_dict["class_name"]
-    assert len(lvobj_dict["versions"]) == 3
-    assert len(lvobj_dict["cluster_data"]) == 3
+    assert data[:4].hex() == "00000003"  # NumLevels = 3
 
 
 # ============================================================================
@@ -108,12 +101,12 @@ def test_lvclass_with_multi_level_inheritance():
 
 def test_lvflatten_with_lvclass_decorated_object():
     """Test that lvflatten() works with @lvclass decorated objects."""
-    @lvclass(library="TestLib", class_name="SimpleClass")
-    class SimpleClass:
-        def __init__(self):
-            self.count = 42
+    @lvclass(library="TestLib", class_name="SimpleClass1")
+    class SimpleClass1:
+        count: LVI32
     
-    obj = SimpleClass()
+    obj = SimpleClass1()
+    obj.count = 42
     data = lvflatten(obj)
     
     assert isinstance(data, bytes)
@@ -123,21 +116,50 @@ def test_lvflatten_with_lvclass_decorated_object():
 
 def test_lvclass_roundtrip():
     """Test serialize → deserialize roundtrip with @lvclass."""
-    @lvclass(library="TestLib", class_name="TestClass")
-    class TestClass:
-        def __init__(self):
-            self.message = "Test Message"
-            self.value = 123
+    @lvclass(library="TestLib", class_name="RoundtripClass")
+    class RoundtripClass:
+        message: str
+        value: LVI32
     
-    obj = TestClass()
-    serialized = obj.to_bytes()
+    obj = RoundtripClass()
+    obj.message = "Test Message"
+    obj.value = 123
     
-    # Deserialize
-    obj_construct = LVObject()
-    deserialized = obj_construct.parse(serialized)
+    serialized = lvflatten(obj)
     
-    assert deserialized["num_levels"] == 1
-    assert "TestLib.lvlib:TestClass.lvclass" in deserialized["class_name"]
+    # Deserialize - should automatically return RoundtripClass instance
+    deserialized = lvunflatten(serialized)
+    
+    assert isinstance(deserialized, RoundtripClass)
+    assert deserialized.message == "Test Message"
+    assert deserialized.value == 123
+
+
+def test_lvclass_roundtrip_with_inheritance():
+    """Test serialize → deserialize roundtrip with 3-level inheritance."""
+    @lvclass(library="Base", class_name="BaseMsg")
+    class BaseMsg:
+        pass
+    
+    @lvclass(library="Middle", class_name="MiddleMsg", version=(1, 0, 0, 7))
+    class MiddleMsg(BaseMsg):
+        pass
+    
+    @lvclass(library="Derived", class_name="DerivedMsg")
+    class DerivedMsg(MiddleMsg):
+        message: str
+        code: LVU16
+    
+    obj = DerivedMsg()
+    obj.message = "Hello World"
+    obj.code = 42
+    
+    serialized = lvflatten(obj)
+    deserialized = lvunflatten(serialized)
+    
+    assert isinstance(deserialized, DerivedMsg)
+    assert deserialized.message == "Hello World"
+    assert deserialized.code == 42
 
 
 # ============================================================================
@@ -169,16 +191,15 @@ def test_is_lvclass_with_regular_class():
 
 def test_lvclass_with_typed_fields():
     """Test @lvclass with various field types."""
-    @lvclass(library="TestLib", class_name="MultiFieldClass")
-    class MultiFieldClass:
-        def __init__(self):
-            self.name = "Test"
-            self.count = 100
-            self.active = True
-            self.value = 3.14
+    @lvclass(library="TestLib", class_name="MultiFieldClass1")
+    class MultiFieldClass1:
+        name: str
+        count: LVI32
     
-    obj = MultiFieldClass()
-    data = obj.to_bytes()
+    obj = MultiFieldClass1()
+    obj.name = "Test"
+    obj.count = 100
+    data = lvflatten(obj)
     
     assert isinstance(data, bytes)
     assert len(data) > 0
@@ -190,12 +211,12 @@ def test_lvclass_with_typed_fields():
 
 def test_lvclass_empty_object():
     """Test @lvclass with object that has no fields."""
-    @lvclass(library="TestLib", class_name="EmptyClass")
-    class EmptyClass:
+    @lvclass(library="TestLib", class_name="EmptyClass1")
+    class EmptyClass1:
         pass
     
-    obj = EmptyClass()
-    data = obj.to_bytes()
+    obj = EmptyClass1()
+    data = lvflatten(obj)
     
     # Should still serialize as a valid LVObject
     assert isinstance(data, bytes)
@@ -204,13 +225,14 @@ def test_lvclass_empty_object():
 
 def test_lvflatten_integration():
     """Test that lvflatten automatically handles @lvclass objects."""
-    @lvclass(library="Commander", class_name="echo general Msg")
-    class EchoMsg:
-        def __init__(self):
-            self.message = "Hello, LabVIEW!"
-            self.status = 0
+    @lvclass(library="Commander", class_name="IntegrationEchoMsg")
+    class IntegrationEchoMsg:
+        message: str
+        status: LVI32
     
-    msg = EchoMsg()
+    msg = IntegrationEchoMsg()
+    msg.message = "Hello, LabVIEW!"
+    msg.status = 0
     
     # Should serialize automatically without type_hint
     data = lvflatten(msg)
@@ -218,3 +240,32 @@ def test_lvflatten_integration():
     assert isinstance(data, bytes)
     # Verify it's a proper LVObject (single level = 1)
     assert data[:4].hex() == "00000001"  # NumLevels = 1
+
+
+def test_lvunflatten_class_not_in_registry():
+    """Test lvunflatten with class not in registry returns dict with warning."""
+    # Create raw LVObject bytes for a class not in registry
+    from src import create_lvobject, LVObject
+    
+    obj_data = create_lvobject(
+        class_name="NonExistent.lvlib:NonExistent.lvclass",
+        num_levels=1,
+        versions=[(1, 0, 0, 0)],
+        cluster_data=[b'']
+    )
+    
+    obj_construct = LVObject()
+    serialized = obj_construct.build(obj_data)
+    
+    # Should warn and return dict
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        result = lvunflatten(serialized)
+        
+        # Check that a warning was issued
+        assert len(w) >= 1
+        assert "not found in registry" in str(w[-1].message)
+    
+    # Result should be a dict
+    assert isinstance(result, dict)
+    assert result["class_name"] == "NonExistent.lvlib:NonExistent.lvclass"

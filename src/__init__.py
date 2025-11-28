@@ -9,10 +9,11 @@ Key Features:
     - Type hints for all functions
     - Big-endian byte order (network byte order)
     - Validated against real LabVIEW HEX examples
+    - Automatic class registry for deserialization
 
 Public API:
     - lvflatten: Serialize Python data to LabVIEW format
-    - lvunflatten: Deserialize LabVIEW data to Python
+    - lvunflatten: Deserialize LabVIEW data to Python (automatic class detection)
     
 Basic Types:
     - LVI32, LVU32, LVI16, LVU16, LVI8, LVU8, LVI64, LVU64
@@ -21,21 +22,31 @@ Basic Types:
     - LVString
 
 Compound Types:
-    - LVArray1D: 1D arrays
-    - LVArray2D: 2D/multi-dimensional arrays
+    - LVArray: N-dimensional arrays
     - LVCluster: Heterogeneous collections
 
 Object Types:
     - LVObject: LabVIEW objects with inheritance support
+    - @lvclass decorator: Mark Python classes as LabVIEW Objects
 
 Usage:
-    >>> from src.construct_impl import lvflatten, lvunflatten, LVI32
-    >>> data = lvflatten(42)
-    >>> print(data.hex())
-    0000002a
-    >>> value = lvunflatten(data, LVI32)
-    >>> print(value)
-    42
+    >>> from src import lvclass, lvflatten, lvunflatten
+    >>> 
+    >>> @lvclass(library="MyLib", class_name="MyClass")
+    >>> class MyClass:
+    >>>     message: str
+    >>>     code: int
+    >>> 
+    >>> obj = MyClass()
+    >>> obj.message = "Hello"
+    >>> obj.code = 42
+    >>> 
+    >>> data = lvflatten(obj)   # Serialize to bytes
+    >>> restored = lvunflatten(data)  # Automatically returns MyClass instance
+    >>> 
+    >>> assert isinstance(restored, MyClass)
+    >>> assert restored.message == "Hello"
+    >>> assert restored.code == 42
 """
 
 from .api import (
@@ -88,8 +99,11 @@ from .decorators import (
     # Decorators
     lvclass,
     lvfield,
-    # Helper function
+    # Helper functions
     is_lvclass,
+    get_lvclass_by_name,
+    # Registry (for testing/debugging)
+    _LVCLASS_REGISTRY,
 )
 
 __all__ = [
@@ -126,10 +140,12 @@ __all__ = [
     "create_empty_lvobject",
     "create_lvobject",
     "LVObjectType",
-    # Decorators
+    # Decorators and helpers
     "lvclass",
     "lvfield",
     "is_lvclass",
+    "get_lvclass_by_name",
+    "_LVCLASS_REGISTRY",
 ]
 
-__version__ = "0.2.1"
+__version__ = "0.3.0"

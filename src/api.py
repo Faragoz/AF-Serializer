@@ -6,7 +6,7 @@ LabVIEW data using the Construct library implementation.
 
 Functions:
     lvflatten: Serialize Python data to LabVIEW binary format
-    lvunflatten: Deserialize LabVIEW binary data to Python
+    lvunflatten: Deserialize LabVIEW binary data to Python (automatic class detection)
 """
 
 from typing import Any, Optional, Type, Union
@@ -18,6 +18,7 @@ from .basic_types import (
     LVI32Type, LVU32Type, LVI16Type, LVU16Type, LVI8Type, LVU8Type,
     LVI64Type, LVU64Type, LVDoubleType, LVSingleType, LVBooleanType, LVStringType,
 )
+from .objects import LVObject
 
 
 # Type mapping for auto-inference
@@ -66,22 +67,18 @@ def lvflatten(data: Any, type_hint: Optional[Construct] = None) -> bytes:
         >>> lvflatten("Hello")  # Auto-detect as String
         b'\\x00\\x00\\x00\\x05Hello'
         
-        >>> lvflatten(3.14)  # Auto-detect as Double
-        b'@\\t!\\xfbTH-\\x18'
-        
-        >>> lvflatten(True)  # Auto-detect as Boolean
-        b'\\x01'
+        >>> @lvclass(library="MyLib", class_name="MyClass")
+        >>> class MyClass:
+        >>>     value: int = 0
+        >>> obj = MyClass()
+        >>> obj.value = 42
+        >>> data = lvflatten(obj)  # Automatic LVObject serialization
     """
     # Check if data is a @lvclass decorated object
     if hasattr(data.__class__, '__is_lv_class__') and data.__class__.__is_lv_class__:
-        # Auto-serialize using the to_bytes method
-        if hasattr(data, 'to_bytes'):
-            return data.to_bytes()
-        else:
-            raise TypeError(
-                f"Object of type {type(data).__name__} is marked as LabVIEW class "
-                f"but doesn't have to_bytes() method"
-            )
+        # Auto-serialize using LVObject construct
+        obj_construct = LVObject()
+        return obj_construct.build(data)
     
     # Use provided type hint or auto-detect
     if type_hint is None:
@@ -99,25 +96,48 @@ def lvflatten(data: Any, type_hint: Optional[Construct] = None) -> bytes:
     return type_hint.build(data)
 
 
-def lvunflatten(data: bytes, type_hint: Construct) -> Any:
+def lvunflatten(data: bytes, type_hint: Optional[Construct] = None) -> Any:
     """
     Deserialize LabVIEW binary data to Python.
     
-    This function converts LabVIEW binary format to Python data types.
+    For LVObject data (detected by num_levels > 0), automatically uses registry
+    lookup to return the correct @lvclass instance with populated attributes.
+    
+    For basic types, requires a type_hint to specify the expected format.
     
     Args:
         data: Binary data in LabVIEW format (big-endian).
-        type_hint: Construct type definition specifying the expected format.
-            Required for deserialization. Examples: LVI32, LVDouble, LVString
+        type_hint: Optional Construct type definition specifying the expected format.
+            If None and data is LVObject, uses automatic class detection via registry.
+            Examples: LVI32, LVDouble, LVString, LVBoolean
     
     Returns:
-        Deserialized Python value matching the type_hint.
+        For LVObject data:
+            - Instance of @lvclass decorated class (if class found in registry)
+            - dict with raw bytes (if class not found in registry)
+        For basic types:
+            - Deserialized Python value matching the type_hint
     
     Raises:
+        ValueError: If type_hint is None and data is not LVObject format.
         ConstructError: If data doesn't match the expected format.
-        ValidationError: If data contains invalid values (e.g., boolean not 0x00/0x01).
     
     Examples:
+        # Automatic LVObject deserialization (no type_hint needed):
+        >>> @lvclass(library="MyLib", class_name="EchoMsg")
+        >>> class EchoMsg:
+        >>>     message: str
+        >>>     code: int
+        >>> msg = EchoMsg()
+        >>> msg.message = "Hello"
+        >>> msg.code = 42
+        >>> data = lvflatten(msg)
+        >>> restored = lvunflatten(data)  # Automatically returns EchoMsg instance
+        >>> assert isinstance(restored, EchoMsg)
+        >>> assert restored.message == "Hello"
+        >>> assert restored.code == 42
+        
+        # Basic type deserialization (requires type_hint):
         >>> data = b'\\x00\\x00\\x00*'
         >>> lvunflatten(data, LVI32)
         42
@@ -125,15 +145,12 @@ def lvunflatten(data: bytes, type_hint: Construct) -> Any:
         >>> data = b'\\x00\\x00\\x00\\x05Hello'
         >>> lvunflatten(data, LVString)
         'Hello'
-        
-        >>> data = b'@\\t!\\xfbTH-\\x18'
-        >>> lvunflatten(data, LVDouble)
-        3.14
-        
-        >>> data = b'\\x01'
-        >>> lvunflatten(data, LVBoolean)
-        True
     """
+    if type_hint is None:
+        # Try to parse as LVObject (automatic detection)
+        obj_construct = LVObject()
+        return obj_construct.parse(data)
+    
     return type_hint.parse(data)
 
 

@@ -4,279 +4,197 @@ LabVIEW data serialization library for Python. Serialize Python data structures 
 
 ## Features
 
+- **Simple API** - Use `lvflatten()` to serialize and `lvunflatten()` to deserialize
+- **Automatic class detection** - Registry-based automatic class identification during deserialization
 - **Auto-detection of Python types** - Automatically infers LabVIEW types from Python data
-- **Simple API** - Use `lvflatten()` to serialize any Python object
-- **Modular architecture** - Clean separation of concerns with specialized modules
-- **Support for complex structures** - Handles nested lists, tuples, dictionaries, and custom objects
-- **LabVIEW compatibility** - Produces binary format 100% compatible with LabVIEW flatten/unflatten
+- **3-level inheritance support** - Full support for LabVIEW class hierarchies
 - **Validated against real HEX examples** - All formats validated against LabVIEW documentation
 
 ## Installation
 
 ```bash
-pip install numpy  # Required dependency
+pip install construct  # Required dependency
 ```
 
 ## Quick Start
 
-### Auto-Flatten (Recommended)
+### Automatic Serialization & Deserialization (Recommended)
 
-Use `lvflatten()` to automatically serialize Python data without manual type specification:
+Use `lvflatten()` to serialize and `lvunflatten()` to automatically deserialize:
 
 ```python
-from src import lvflatten
+from src import lvclass, lvflatten, lvunflatten, LVU16
 
-# Simple types
+# Define LabVIEW class hierarchy using @lvclass decorator
+@lvclass(library="Actor Framework", class_name="Message")
+class Message:
+    pass
+
+@lvclass(library="Serializable Message", class_name="Serializable Msg",
+         version=(1, 0, 0, 7))
+class SerializableMsg(Message):
+    pass
+
+@lvclass(library="Commander", class_name="echo general Msg")
+class EchoMsg(SerializableMsg):
+    message: str      # → LVString
+    code: LVU16       # → U16 (2 bytes)
+
+# Create and populate an instance
+msg = EchoMsg()
+msg.message = "Hello World!"
+msg.code = 42
+
+# Serialize with lvflatten()
+data = lvflatten(msg)
+print(f"Serialized: {data.hex()}")
+
+# Deserialize with lvunflatten() - NO parameters needed!
+restored = lvunflatten(data)
+print(f"Restored type: {type(restored).__name__}")  # EchoMsg
+print(f"Message: {restored.message}")  # Hello World!
+print(f"Code: {restored.code}")  # 42
+
+# Verify
+assert isinstance(restored, EchoMsg)
+assert restored.message == "Hello World!"
+assert restored.code == 42
+```
+
+### Basic Types
+
+Use `lvflatten()` to automatically serialize Python data:
+
+```python
+from src import lvflatten, lvunflatten, LVI32, LVString
+
+# Simple types - serialize
 lvflatten(42)                    # Integer → I32
 lvflatten(3.14)                  # Float → Double
 lvflatten("Hello World")         # String
 lvflatten(True)                  # Boolean
 
-# Arrays (homogeneous lists)
-lvflatten([1, 2, 3])            # Array 1D of I32
-# Output: 00000003 00000001 00000002 00000003
+# With explicit type hint - deserialize
+data = lvflatten(42)
+value = lvunflatten(data, LVI32)  # Returns 42
 
-# Clusters (tuples or heterogeneous data)
-lvflatten(("Hello", 1, 0.15))   # Cluster without names
-
-# Named Clusters (dictionaries)
-lvflatten({"x": 10, "y": 20, "label": "Point A"})
-
-# Complex nested structures
-lvflatten({
-    "header": ("v1.0", 123),
-    "values": [10, 20, 30],
-    "active": True
-})
+data = lvflatten("Hello")
+text = lvunflatten(data, LVString)  # Returns "Hello"
 ```
-
-### Manual Type Specification
-
-For more control, use the lower-level API:
-
-```python
-from src import LVSerializer, LVNumeric, LVString, LVCluster
-import numpy as np
-
-serializer = LVSerializer()
-
-# Create LabVIEW types manually
-num = LVNumeric(42, np.int32)
-text = LVString("Hello LabVIEW")
-
-# Create cluster with named fields
-names = ("x", "y", "label")
-values = (
-    LVNumeric(10.5, np.float64),
-    LVNumeric(20.3, np.float64),
-    LVString("Point A")
-)
-cluster = LVCluster((names, values))
-
-# Serialize
-data = serializer.serialize(cluster)
-print(f"Serialized: {data.hex()}")
-```
-
-### Using the @lvclass Decorator
-
-Create LabVIEW objects from Python classes:
-
-```python
-from src import lvflatten, lvclass
-
-@lvclass(library="Commander", class_name="echo general Msg")
-class EchoMsg:
-    message: str = ""
-    status: int = 0
-
-msg = EchoMsg()
-msg.message = "Hello, LabVIEW!"
-msg.status = 1
-
-# Serialize automatically (future feature)
-# serialized = lvflatten(msg)
-```
-
-## Architecture
-
-The library is organized in a modular structure for maintainability:
-
-```
-src/
-├── __init__.py           # Main exports
-├── Serializer.py         # Backward compatibility wrapper
-├── descriptors.py        # TypeDescriptor, TypeDescriptorID
-├── serialization.py      # SerializationContext, ISerializable
-├── auto_flatten.py       # lvflatten(), auto-detection
-├── lv_serializer.py      # LVSerializer high-level API
-├── decorators.py         # @lvclass decorator
-└── types/
-    ├── __init__.py       # Type exports
-    ├── basic.py          # LVNumeric, LVBoolean, LVString
-    ├── compound.py       # LVArray, LVCluster
-    ├── objects.py        # LVObject, LVObjectMetadata
-    └── variant.py        # LVVariant
-```
-
-## Type Inference Rules
-
-The auto-detection system (`_auto_infer_type()`) uses these rules:
-
-| Python Type | LabVIEW Type | Format | Example Output |
-|-------------|--------------|--------|----------------|
-| `bool` | `LVBoolean` | 1 byte | `01` (True), `00` (False) |
-| `int` | `LVNumeric(I32)` | 4 bytes BE | `00000001` (1) |
-| `float` | `LVNumeric(Double)` | 8 bytes BE | `3FD51EB851EB851F` (0.33) |
-| `str` | `LVString` | I32 length + UTF-8 | `0000000B 48656C6C6F20576F726C64` ("Hello World") |
-| `list` (homogeneous) | `LVArray` | See Array format | `00000003 ...` (3 elements) |
-| `list` (heterogeneous) | `LVCluster` | Concatenated data | No header |
-| `tuple` | `LVCluster` | Concatenated data | No header |
-| `dict` | `LVCluster` (named) | Concatenated data | No header |
-| `LVType` | Unchanged | As defined | - |
-
-**Note**: Boolean is checked before int since `bool` is a subclass of `int` in Python.
-
-## LabVIEW Data Formats
 
 ### Arrays
 
-LVArray automatically handles 1D, 2D, 3D, and higher dimensional arrays.
-
-The format is: `[dim0 (I32)] [dim1 (I32)] ... [dimN-1 (I32)] [elements...]`
-
-Dimensions are auto-detected by reading until `prod(dims) * element_size == remaining_bytes`.
-
-**1D Array**: `[num_elements (I32)] + [elements...]`
 ```python
 from src import LVArray, LVI32
 
+# 1D Array
 arr = LVArray(LVI32)
 data = arr.build([1, 2, 3])
-# Output: 00000003 00000001 00000002 00000003
-
 parsed = arr.parse(data)  # Returns [1, 2, 3]
-```
 
-**2D Array**: `[dim0_size (I32)] [dim1_size (I32)] + [elements...]`
-```python
-from src import LVArray, LVI32
-
-arr = LVArray(LVI32)
+# 2D Array
 data = arr.build([[1, 2, 3], [4, 5, 6]])
-# Output: 00000002 00000003 00000001 00000002 00000003 00000004 00000005 00000006
-# Header: dim0=2, dim1=3
-
 parsed = arr.parse(data)  # Returns [[1, 2, 3], [4, 5, 6]]
-```
 
-**3D Array**: `[dim0_size (I32)] [dim1_size (I32)] [dim2_size (I32)] + [elements...]`
-```python
-from src import LVArray, LVI32
-
-arr = LVArray(LVI32)
-# 2×4×4 array
+# 3D Array
 data_3d = [
-    [[7, 0, 0, 0], [8, 0, 0, 0], [0, 0, 3, 0], [0, 0, 0, 5]],
-    [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 6], [0, 0, 0, 0]]
+    [[7, 0, 0, 0], [8, 0, 0, 0]],
+    [[0, 0, 0, 0], [0, 0, 0, 0]]
 ]
-serialized = arr.build(data_3d)
-# Header: 00000002 00000004 00000004 (dims=2,4,4)
-
-parsed = arr.parse(serialized)  # Returns the original 3D array
+data = arr.build(data_3d)
+parsed = arr.parse(data)  # Returns original 3D array
 ```
 
 ### Clusters
 
-Clusters concatenate data **without a count header**:
 ```python
-# String "Hello, LabVIEW!" + I32(0)
-# Output: 0000000F 48656C6C6F2C204C6162564945572100 00000000
-#         ^^^^^^^^ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^^^^^^
-#         length   "Hello, LabVIEW!"                 I32(0)
+from src import LVCluster, LVString, LVI32
+
+cluster = LVCluster(LVString, LVI32)
+data = cluster.build(("Hello, LabVIEW!", 42))
+parsed = cluster.parse(data)  # Returns ("Hello, LabVIEW!", 42)
 ```
 
-### Strings
+## Architecture
 
-Format: `[length (I32)] + [UTF-8 bytes]`
+The library uses a registry-based system for automatic class detection:
+
+```
+src/
+├── __init__.py           # Main exports
+├── api.py                # lvflatten, lvunflatten
+├── decorators.py         # @lvclass decorator and registry
+├── objects.py            # LVObject serialization
+├── basic_types.py        # LVI32, LVString, etc.
+└── compound_types.py     # LVArray, LVCluster
+```
+
+## The @lvclass Decorator
+
+The `@lvclass` decorator registers Python classes in a global registry, enabling automatic identification during deserialization:
+
 ```python
-lvflatten("Hello")
-# Output: 00000005 48656C6C6F
+from src import lvclass, lvflatten, lvunflatten, LVI32
+
+@lvclass(library="MyLib", class_name="MyClass", version=(1, 0, 0, 1))
+class MyClass:
+    value: LVI32
+    name: str
+
+obj = MyClass()
+obj.value = 100
+obj.name = "Test"
+
+# Serialize
+data = lvflatten(obj)
+
+# Deserialize - automatically returns MyClass instance
+restored = lvunflatten(data)
+assert isinstance(restored, MyClass)
+```
+
+### Inheritance Support
+
+The decorator automatically detects inheritance chains:
+
+```python
+@lvclass(library="Base", class_name="BaseClass")
+class BaseClass:
+    pass
+
+@lvclass(library="Derived", class_name="DerivedClass")
+class DerivedClass(BaseClass):
+    value: LVI32
+
+# This creates a 2-level LVObject
+obj = DerivedClass()
+obj.value = 42
+data = lvflatten(obj)  # num_levels = 2
 ```
 
 ## Supported LabVIEW Types
 
-- **Numeric**: int8, int16, int32, int64, uint8, uint16, uint32, uint64, float32, float64
+- **Numeric**: I8, I16, I32, I64, U8, U16, U32, U64, Single, Double
 - **Boolean**: 8-bit boolean
-- **String**: Length-prefixed UTF-8 strings
-- **Array**: 1D, 2D, 3D, and N-dimensional arrays of homogeneous types (auto-detects dimensions)
+- **String**: Length-prefixed strings
+- **Array**: 1D, 2D, 3D, and N-dimensional arrays
 - **Cluster**: Ordered collections of heterogeneous types
-- **Variant**: Type descriptor + data
-- **Objects**: LabVIEW objects with inheritance support
+- **Objects**: LabVIEW objects with full inheritance support
 
-## Examples
+## Type Hints
 
-### Example 1: Simple Types
+When using the `@lvclass` decorator, use type hints to specify field types:
 
-```python
-from src import lvflatten
-
-# Primitives
-print(lvflatten(1).hex())           # 00000001
-print(lvflatten(True).hex())        # 01
-print(lvflatten("Hello").hex())     # 0000000548656C6C6F
-print(lvflatten(3.14).hex())        # 400921FB54442D18
-
-# Arrays
-print(lvflatten([1, 2, 3]).hex())   # 0000000300000001000000020000000003
-```
-
-### Example 2: Nested Structures
-
-```python
-from src import lvflatten
-
-# Complex nested tuple
-data = ("Hello World", 1, 0.15, ["a", "b", "c"], [1, 2, 3])
-result = lvflatten(data)
-print(f"Result: {result.hex()}")
-
-# Dictionary with nested structures
-data = {
-    "header": ("v1.0", 123),
-    "values": [10, 20, 30],
-    "active": True
-}
-result = lvflatten(data)
-print(f"Result: {result.hex()}")
-```
-
-### Example 3: Custom LabVIEW Object
-
-```python
-from src import LVObject, LVCluster, LVNumeric, LVBoolean, LVString, LVSerializer
-import numpy as np
-
-class MyLVObject(LVObject):
-    __lv_version__ = (1, 2, 3, 4)
-    __lv_library__ = "MyLibrary"
-    
-    def _initialize_private_data(self) -> LVCluster:
-        names = ("timestamp", "value", "status")
-        values = (
-            LVNumeric(0, np.uint64),
-            LVNumeric(0.0, np.float64),
-            LVBoolean(False)
-        )
-        return LVCluster((names, values))
-
-obj = MyLVObject()
-obj.set_data(1234567890, 42.5, True)
-
-serializer = LVSerializer()
-data = serializer.serialize(obj)
-print(f"Serialized object: {data.hex()}")
-```
+| Python Type Hint | LabVIEW Type | Size |
+|-----------------|--------------|------|
+| `str` | LVString | variable |
+| `int` | LVI32 | 4 bytes |
+| `float` | LVDouble | 8 bytes |
+| `bool` | LVBoolean | 1 byte |
+| `LVI32` | I32 | 4 bytes |
+| `LVU16` | U16 | 2 bytes |
+| `LVDouble` | Double | 8 bytes |
+| `LVArray(LVI32)` | Array of I32 | variable |
 
 ## Testing
 
@@ -287,87 +205,95 @@ Run the test suite:
 pytest tests/ -v
 
 # Specific test files
-pytest tests/test_auto_flatten.py -v
-pytest tests/test_hex_validation.py -v
+pytest tests/test_decorators.py -v
+pytest tests/test_objects.py -v
 ```
 
-Current test coverage:
-- **25 tests total**, all passing ✅
-- **17 tests** for auto-flatten functionality
-- **8 tests** validating against real LabVIEW HEX examples
+## Example: Complete Roundtrip
 
-Test categories:
-- Primitive type inference
-- List/tuple/dict inference  
-- Nested structures
-- Edge cases (empty collections, unsupported types)
-- HEX format validation (I32, Double, Boolean, String, Arrays, Clusters)
+```python
+from src import lvclass, lvflatten, lvunflatten, LVU16, LVI32
+
+# Define a 3-level class hierarchy
+@lvclass(library="Level1", class_name="Base")
+class Base:
+    pass
+
+@lvclass(library="Level2", class_name="Middle", version=(1, 0, 0, 7))
+class Middle(Base):
+    pass
+
+@lvclass(library="Level3", class_name="Derived")
+class Derived(Middle):
+    message: str
+    code: LVU16
+    count: LVI32
+
+# Create and populate
+obj = Derived()
+obj.message = "Hello World"
+obj.code = 42
+obj.count = 100
+
+# Serialize
+data = lvflatten(obj)
+
+# Deserialize - automatic class detection!
+restored = lvunflatten(data)
+
+# Verify
+assert isinstance(restored, Derived)
+assert restored.message == "Hello World"
+assert restored.code == 42
+assert restored.count == 100
+print("✓ Roundtrip successful!")
+```
 
 ## API Reference
 
 ### Main Functions
 
-#### `lvflatten(data, context=None) -> bytes`
+#### `lvflatten(data, type_hint=None) -> bytes`
 
-Automatically serialize any Python data to LabVIEW format.
+Serialize Python data to LabVIEW binary format.
 
-**Parameters:**
-- `data`: Any Python type (int, float, str, list, tuple, dict, nested)
-- `context`: Optional `SerializationContext` for custom settings
+```python
+# @lvclass instance
+data = lvflatten(my_object)
 
-**Returns:**
-- `bytes`: LabVIEW-compatible binary data
+# Basic types with auto-detection
+data = lvflatten(42)        # I32
+data = lvflatten("Hello")   # String
+data = lvflatten(3.14)      # Double
 
-**Raises:**
-- `ValueError`: For empty lists/tuples/dicts
-- `TypeError`: For unsupported types
+# With explicit type hint
+data = lvflatten(42, LVI64)  # Force I64
+```
 
-#### `lvunflatten(data, type_hint=None, context=None) -> Any`
+#### `lvunflatten(data, type_hint=None) -> Any`
 
-Deserialize LabVIEW data to Python (placeholder - not yet implemented).
+Deserialize LabVIEW binary data to Python.
 
-### Internal Functions
+```python
+# LVObject with automatic class detection (no type_hint)
+obj = lvunflatten(data)  # Returns @lvclass instance
 
-#### `_auto_infer_type(data) -> LVType`
+# Basic types (requires type_hint)
+value = lvunflatten(data, LVI32)
+text = lvunflatten(data, LVString)
+```
 
-Infer LabVIEW type from Python data. Used internally by `lvflatten()`.
+### Helper Functions
 
-## Project Status
+#### `get_lvclass_by_name(full_name) -> Optional[Type]`
 
-### ✅ Completed
-- [x] Auto-detection of Python types
-- [x] Modular architecture with clear separation of concerns
-- [x] Array 1D/2D/3D/ND serialization (validated against HEX examples)
-- [x] Cluster serialization (validated against HEX examples)
-- [x] Basic types (I32, Double, Boolean, String)
-- [x] Backward compatibility layer
-- [x] Comprehensive test suite
-- [x] @lvclass decorator for custom objects
-- [x] LVArray auto-detection of dimensions (1D, 2D, 3D, ND)
-- [x] LVArray default value `[]` in Objects.py for type hints
+Lookup a class in the registry by its LabVIEW name.
 
-### 🚧 In Progress / Future Work
-- [ ] Fixed Point serialization
-- [ ] Complete LVObject serialization (Actor, Commander, etc.)
-- [ ] Deserialization (lvunflatten)
-- [ ] TypeDescriptor.from_bytes() full implementation
-- [ ] Round-trip tests (serialize → deserialize → compare)
+```python
+from src import get_lvclass_by_name
 
-## Contributing
-
-Contributions welcome! Please ensure:
-- All tests pass: `pytest tests/ -v`
-- Code follows existing style
-- New features include tests
-- HEX output validated against LabVIEW when possible
-
-## References
-
-Additional documentation available in the `docs/` directory:
-- `LBTypeDescriptor.txt` - Type descriptor reference
-- `LVObjects.txt` - Object serialization format
-- `HTML/Type-Descriptors-NI.html` - NI documentation
-- `HTML/LabVIEW-Manager-Data-Types-NI.html` - Data types reference
+cls = get_lvclass_by_name("MyLib.lvlib:MyClass.lvclass")
+```
 
 ## License
 

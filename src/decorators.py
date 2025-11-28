@@ -5,11 +5,11 @@ This module provides decorators to easily convert Python classes to LabVIEW Obje
 making it simpler to work with the construct_impl serialization system.
 """
 
-from typing import Optional, Any, List, get_type_hints
+from typing import Optional, Any, List, Type, get_type_hints
 from functools import wraps
 import inspect
+import warnings
 
-from .objects import create_lvobject, LVObject
 from .basic_types import (
     LVI32, LVU32, LVI16, LVU16, LVI8, LVU8, LVI64, LVU64,
     LVString, LVBoolean, LVDouble, LVSingle
@@ -17,13 +17,34 @@ from .basic_types import (
 from .compound_types import LVCluster
 
 
+# ============================================================================
+# Class Registry
+# ============================================================================
+
+_LVCLASS_REGISTRY: dict[str, Type] = {}
+"""Global registry mapping LabVIEW class names to Python classes."""
+
+
+def get_lvclass_by_name(full_name: str) -> Optional[Type]:
+    """
+    Lookup @lvclass decorated class by LabVIEW name.
+    
+    Args:
+        full_name: The full LabVIEW class name (e.g., "MyLib.lvlib:MyClass.lvclass")
+    
+    Returns:
+        The Python class if found, None otherwise
+    """
+    return _LVCLASS_REGISTRY.get(full_name)
+
+
 def lvclass(library: str = "", class_name: Optional[str] = None, 
             version: tuple = (1, 0, 0, 1)):
     """
     Decorator to mark a Python class as a LabVIEW Object.
     
-    This decorator enables automatic serialization of Python class instances
-    to LabVIEW Object format using the construct_impl system.
+    This decorator enables automatic serialization and deserialization of Python 
+    class instances to/from LabVIEW Object format using registry lookup.
     
     The decorator automatically detects inheritance from other @lvclass decorated
     classes and determines the number of levels, versions, and cluster data.
@@ -34,14 +55,14 @@ def lvclass(library: str = "", class_name: Optional[str] = None,
         class_name: LabVIEW class name (without .lvclass extension). 
                    If None, uses the Python class name.
         version: Version tuple (major, minor, patch, build).
-                Optional - defaults to (1, 0, 0, 0).
+                Optional - defaults to (1, 0, 0, 1).
     
     The decorator:
+    - Registers the class in the global _LVCLASS_REGISTRY
     - Stores LabVIEW metadata on the class
     - Auto-detects inheritance levels from decorated base classes
-    - Collects versions from entire inheritance chain
-    - Serializes based on Type Hints for cluster fields
     - Enables automatic serialization via lvflatten()
+    - Enables automatic deserialization via lvunflatten()
     
     Examples:
         Simple class:
@@ -65,99 +86,29 @@ def lvclass(library: str = "", class_name: Optional[str] = None,
         >>>     message: str
         >>>     code: int
         
-        Then serialize:
+        Serialize and deserialize:
         >>> msg = EchoMsg()
         >>> msg.message = "Hello World"
         >>> msg.code = 0
-        >>> from api import lvflatten
+        >>> from api import lvflatten, lvunflatten
         >>> data = lvflatten(msg)  # Auto-serializes with 3 levels
+        >>> restored = lvunflatten(data)  # Automatically returns EchoMsg instance
     """
     def decorator(cls):
+        # Build full LabVIEW name
+        lv_library = library if library else ""
+        lv_class = class_name if class_name else cls.__name__
+        
+        full_name = f"{lv_library}.lvlib:{lv_class}.lvclass" if lv_library else f"{lv_class}.lvclass"
+        
+        # Register in global registry
+        _LVCLASS_REGISTRY[full_name] = cls
+        
         # Store LabVIEW metadata on the class
-        cls.__lv_library__ = library if library else ""
-        cls.__lv_class_name__ = class_name if class_name else cls.__name__
+        cls.__lv_library__ = lv_library
+        cls.__lv_class_name__ = lv_class
         cls.__lv_version__ = version
         cls.__is_lv_class__ = True
-        # Add a method to serialize the instance
-        original_init = cls.__init__ if hasattr(cls, '__init__') else None
-        
-        def __init__(self, *args, **kwargs):
-            if original_init:
-                original_init(self, *args, **kwargs)
-        
-        cls.__init__ = __init__
-        
-        # Add a method to convert to LVObject dict
-        def to_lvobject(self) -> dict:
-            """
-            Convert this Python instance to a LabVIEW Object dictionary.
-            
-            Automatically detects inheritance chain and builds complete LVObject.
-            
-            Returns:
-                Dictionary suitable for LVObject serialization
-            """
-            # Walk up the inheritance chain to find all @lvclass decorated base classes
-            inheritance_chain = []
-            for base in inspect.getmro(self.__class__):
-                if hasattr(base, '__is_lv_class__') and base.__is_lv_class__:
-                    inheritance_chain.append(base)
-
-            # Reverse to go from root to derived
-            inheritance_chain.reverse()
-            
-            num_levels = len(inheritance_chain)
-            
-            # Collect versions for all levels
-            versions = []
-            for level_class in inheritance_chain:
-                versions.insert(0,level_class.__lv_version__)
-            
-            # Build cluster data for each level
-            # The decorator extracts type hints and values, Object.py does the serialization
-            cluster_data_list = []
-            for i, level_class in enumerate(inheritance_chain):
-                # Get type hints for this specific level
-                level_hints = level_class.__annotations__ if hasattr(level_class, '__annotations__') else {}
-                # Extract values that exist on this instance
-                level_values = {}
-                for attr_name in level_hints.keys():
-                    if hasattr(self, attr_name):
-                        level_values[attr_name] = getattr(self, attr_name)
-
-                # Let Object.py handle the serialization
-                # This also handles the case where if ANY type hint has a value,
-                # ALL type hints are serialized with defaults
-                from .objects import serialize_type_hints
-                cluster_bytes = serialize_type_hints(level_hints, level_values)
-                cluster_data_list.append(cluster_bytes)
-            
-            # Use only the most derived class name
-            most_derived = inheritance_chain[-1]
-            full_class_name = f"{most_derived.__lv_library__}.lvlib:{most_derived.__lv_class_name__}.lvclass" if most_derived.__lv_library__ else f"{most_derived.__lv_class_name__}.lvclass"
-            
-            # Create LVObject using the new API
-            return create_lvobject(
-                class_name=full_class_name,
-                num_levels=num_levels,
-                versions=versions,
-                cluster_data=cluster_data_list
-            )
-        
-        cls.to_lvobject = to_lvobject
-        
-        # Add a method to serialize directly
-        def to_bytes(self) -> bytes:
-            """
-            Serialize this instance to LabVIEW Object bytes.
-            
-            Returns:
-                Serialized bytes in LabVIEW Object format
-            """
-            obj_construct = LVObject()
-            return obj_construct.build(self.to_lvobject())
-        
-        cls.to_bytes = to_bytes
         
         return cls
     
