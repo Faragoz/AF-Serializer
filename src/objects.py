@@ -280,9 +280,12 @@ class LVObjectAdapter(Adapter):
         
         if target_class is None:
             # Class not found in registry - return dict with raw data
-            warnings.warn(f"Class '{full_class_name}' not found in registry. "
-                         f"Returning dict with raw bytes. "
-                         f"Ensure the class is decorated with @lvclass and imported.")
+            warnings.warn(
+                f"Class '{full_class_name}' not found in registry. "
+                f"Returning dict with raw bytes. "
+                f"Ensure the class is decorated with @lvclass and imported before calling lvunflatten(). "
+                f"Use get_lvclass_by_name('{full_class_name}') to check if the class is registered."
+            )
             return {
                 "num_levels": num_levels,
                 "class_name": full_class_name,
@@ -317,7 +320,11 @@ class LVObjectAdapter(Adapter):
                         for field_name, value in field_values.items():
                             setattr(instance, field_name, value)
                     except Exception as e:
-                        warnings.warn(f"Failed to deserialize cluster data for level {i}: {e}")
+                        warnings.warn(
+                            f"Failed to deserialize cluster data for level {i} ({level_class.__name__}): {e}. "
+                            f"Expected fields: {list(level_hints.keys())}. "
+                            f"Cluster bytes length: {len(cluster_bytes)}."
+                        )
             
             return instance
             
@@ -442,10 +449,11 @@ def _instance_to_lvobject_dict(instance: Any) -> dict:
     
     num_levels = len(inheritance_chain)
     
-    # Collect versions for all levels
+    # Collect versions for all levels (append then reverse for O(n) instead of O(n²))
     versions = []
     for level_class in inheritance_chain:
-        versions.insert(0, level_class.__lv_version__)
+        versions.append(level_class.__lv_version__)
+    versions.reverse()
     
     # Build cluster data for each level
     cluster_data_list = []
