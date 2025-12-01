@@ -331,9 +331,10 @@ def LVArray1D(element_type: Construct) -> Construct:
         [1, 2, 3]
         
     Declarative Style Example:
-        >>> from construct import PrefixedArray, Int32ub, Int16ub
+        >>> from construct import PrefixedArray, Int32ub
+        >>> from src import LVI32
         >>> # You can use PrefixedArray directly for explicit control:
-        >>> MyArray = PrefixedArray(Int32ub, Int16ub)
+        >>> MyArray = PrefixedArray(Int32ub, LVI32)
     """
     return PrefixedArray(Int32ub, element_type)
 
