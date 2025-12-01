@@ -298,3 +298,76 @@ def test_lvobject_various_inheritance_depths(num_levels):
     assert deserialized["num_levels"] == num_levels
     assert len(deserialized["versions"]) == num_levels
     assert len(deserialized["cluster_data"]) == num_levels
+
+
+# ============================================================================
+# Declarative Object Tests
+# ============================================================================
+
+def test_version_struct_declarative():
+    """Test that VersionStruct is used declaratively in LVObject."""
+    from src.objects import VersionStruct
+    
+    # Test building a version
+    version_data = {"major": 1, "minor": 2, "patch": 3, "build": 4}
+    result = VersionStruct.build(version_data)
+    
+    # Each field is Int16ub, so 8 bytes total
+    assert len(result) == 8
+    assert result.hex() == "0001000200030004"
+    
+    # Test parsing
+    parsed = VersionStruct.parse(result)
+    assert parsed.major == 1
+    assert parsed.minor == 2
+    assert parsed.patch == 3
+    assert parsed.build == 4
+
+
+def test_cluster_data_struct_declarative():
+    """Test that ClusterDataStruct is used declaratively in LVObject."""
+    from src.objects import ClusterDataStruct
+    
+    # Test building cluster data
+    cluster_data = {"size": 5, "data": b"Hello"}
+    result = ClusterDataStruct.build(cluster_data)
+    
+    # size (4 bytes) + data (5 bytes)
+    assert len(result) == 9
+    assert result[:4].hex() == "00000005"  # size = 5
+    assert result[4:] == b"Hello"
+    
+    # Test parsing
+    parsed = ClusterDataStruct.parse(result)
+    assert parsed.size == 5
+    assert parsed.data == b"Hello"
+
+
+def test_lvobject_declarative_backward_compatibility():
+    """Test that declarative LVObject maintains backward compatibility."""
+    # Create an object with known binary format and verify it parses correctly
+    obj_construct = LVObject()
+    
+    # Build an object with unique class name to avoid registry collisions
+    original = create_lvobject(
+        class_name="BackwardCompatLib.lvlib:BackwardCompatClass.lvclass",
+        num_levels=1,
+        versions=[(1, 0, 0, 0)],
+        cluster_data=[b'\x00\x00\x00\x01']  # I32(1)
+    )
+    
+    serialized = obj_construct.build(original)
+    
+    # Verify it starts with NumLevels = 1
+    assert serialized[:4].hex() == "00000001"
+    
+    # Parse it back - will return dict since class is not in registry
+    with warnings.catch_warnings(record=True):
+        warnings.simplefilter("always")
+        deserialized = obj_construct.parse(serialized)
+    
+    # Verify structure is preserved (returns dict for unregistered class)
+    assert isinstance(deserialized, dict)
+    assert deserialized["num_levels"] == 1
+    assert deserialized["versions"][0] == (1, 0, 0, 0)
+    assert deserialized["cluster_data"][0] == b'\x00\x00\x00\x01'

@@ -1,15 +1,21 @@
 """
 Construct-based LabVIEW Serialization Implementation.
 
-This module provides an alternative implementation of AF-Serializer using
+This module provides an implementation of AF-Serializer using
 the Construct library for declarative binary format definitions.
 
 Key Features:
-    - Declarative type definitions using Construct
+    - Declarative type definitions using Construct (Struct, PrefixedArray)
     - Type hints for all functions
     - Big-endian byte order (network byte order)
     - Validated against real LabVIEW HEX examples
     - Automatic class registry for deserialization
+
+Declarative Approach:
+    - LVCluster uses Struct internally for field definitions
+    - LVArray1D uses PrefixedArray for simple 1D arrays
+    - LVObject uses declarative VersionStruct and ClusterDataStruct
+    - All types can be composed using Construct's declarative syntax
 
 Public API:
     - lvflatten: Serialize Python data to LabVIEW format
@@ -22,8 +28,9 @@ Basic Types:
     - LVString
 
 Compound Types:
-    - LVArray: N-dimensional arrays
-    - LVCluster: Heterogeneous collections
+    - LVArray: N-dimensional arrays (auto-detects dimensions)
+    - LVArray1D: Simple 1D arrays using declarative PrefixedArray
+    - LVCluster: Heterogeneous collections using declarative Struct
 
 Object Types:
     - LVObject: LabVIEW objects with inheritance support
@@ -47,6 +54,21 @@ Usage:
     >>> assert isinstance(restored, MyClass)
     >>> assert restored.message == "Hello"
     >>> assert restored.code == 42
+
+Declarative Examples:
+    >>> # Using declarative Struct directly
+    >>> from construct import Struct, Int32ub
+    >>> from src import LVString
+    >>> 
+    >>> MyStruct = Struct(
+    ...     "name" / LVString,
+    ...     "value" / Int32ub,
+    ... )
+    >>> 
+    >>> # Using declarative PrefixedArray for 1D arrays
+    >>> from src import LVArray1D, LVI32
+    >>> arr = LVArray1D(LVI32)
+    >>> data = arr.build([1, 2, 3])
 """
 
 from .api import (
@@ -79,6 +101,7 @@ from .basic_types import (
 from .compound_types import (
     # Compound type factories
     LVArray,
+    LVArray1D,
     LVCluster,
     # Type aliases
     LVArrayType,
@@ -93,6 +116,9 @@ from .objects import (
     create_lvobject,
     # Type alias
     LVObjectType,
+    # Declarative structs (for advanced usage)
+    VersionStruct,
+    ClusterDataStruct,
 )
 
 from .decorators import (
@@ -132,6 +158,7 @@ __all__ = [
     "LVStringType",
     # Compound types
     "LVArray",
+    "LVArray1D",
     "LVCluster",
     "LVArrayType",
     "LVClusterType",
@@ -140,6 +167,9 @@ __all__ = [
     "create_empty_lvobject",
     "create_lvobject",
     "LVObjectType",
+    # Declarative structs (for advanced usage)
+    "VersionStruct",
+    "ClusterDataStruct",
     # Decorators and helpers
     "lvclass",
     "lvfield",

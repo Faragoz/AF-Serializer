@@ -2,13 +2,14 @@
 LabVIEW Compound Data Types using Construct Library.
 
 This module implements LabVIEW compound data types (Arrays and Clusters)
-using the Construct library.
+using the Construct library with a declarative approach.
 
 All types use big-endian byte order (network byte order) as required by LabVIEW.
 
 Supported Types:
     - LVArray: Universal array type that auto-detects dimensions (1D, 2D, 3D, etc.)
-    - Cluster: Heterogeneous collections (no header, direct concatenation)
+    - LVArray1D: Simple 1D array using declarative PrefixedArray
+    - LVCluster: Heterogeneous collections using declarative Struct (no header, direct concatenation)
 """
 import math
 from typing import TypeAlias, Annotated, List, Any, Sequence
@@ -16,6 +17,8 @@ from construct import (
     Int32ub,
     Construct,
     Adapter,
+    Struct,
+    PrefixedArray,
     GreedyBytes, SizeofError,
 )
 
@@ -297,16 +300,57 @@ def LVArray(element_type):
     return ArrayAdapter(element_type)
 
 
+def LVArray1D(element_type: Construct) -> Construct:
+    """
+    Create a simple 1D LabVIEW Array construct using declarative PrefixedArray.
+    
+    This is a more declarative alternative to LVArray when you know the array
+    is always 1D. It uses Construct's PrefixedArray directly for clean,
+    declarative code.
+    
+    LabVIEW 1D Array Format:
+        [count (I32)] [elements...]
+    
+    Args:
+        element_type: Construct type for array elements
+    
+    Returns:
+        Construct that can serialize/deserialize 1D arrays
+    
+    Examples:
+        >>> from src import LVArray1D, LVI32
+        >>> arr = LVArray1D(LVI32)
+        >>> data = arr.build([1, 2, 3])
+        >>> print(data.hex())
+        00000003000000010000000200000003
+        >>> arr.parse(data)
+        ListContainer([1, 2, 3])
+        
+        >>> # Convert to regular list
+        >>> list(arr.parse(data))
+        [1, 2, 3]
+        
+    Declarative Style Example:
+        >>> from construct import PrefixedArray, Int32ub, Int16ub
+        >>> # You can use PrefixedArray directly for explicit control:
+        >>> MyArray = PrefixedArray(Int32ub, Int16ub)
+    """
+    return PrefixedArray(Int32ub, element_type)
+
+
 # ============================================================================
 # Cluster Implementation
 # ============================================================================
 
 class ClusterAdapter(Adapter):
     """
-    Adapter for LabVIEW Cluster type.
+    Declarative Adapter for LabVIEW Cluster type using Construct's Struct.
     
     LabVIEW clusters are heterogeneous collections that concatenate data
     WITHOUT a count header. Data is concatenated directly.
+    
+    This implementation uses Construct's Struct for declarative field definitions,
+    providing cleaner code and better alignment with Construct idioms.
     
     Format: Direct concatenation (NO header!)
     Example (String "Hello, LabVIEW!" + I32(0)):
@@ -319,61 +363,57 @@ class ClusterAdapter(Adapter):
         """
         Initialize Cluster adapter with field types.
         
+        Uses Construct's Struct declaratively by creating named fields
+        for each construct.
+        
         Args:
             field_constructs: Sequence of Construct definitions for each field
         """
         self.field_constructs = list(field_constructs)
-        # Use GreedyBytes as we'll handle serialization manually
-        super().__init__(GreedyBytes)
+        
+        # Create declarative Struct with indexed field names
+        struct_fields = []
+        for i, construct in enumerate(field_constructs):
+            field_name = f"field_{i}"
+            struct_fields.append(field_name / construct)
+        
+        self._struct = Struct(*struct_fields)
+        
+        # Use the Struct as the underlying subcon
+        super().__init__(self._struct)
     
-    def _decode(self, obj: bytes, context, path) -> tuple:
-        """Convert bytes to Python tuple."""
-        import io
-        stream = io.BytesIO(obj)
+    def _decode(self, obj, context, path) -> tuple:
+        """
+        Convert Struct Container to Python tuple.
         
+        The Struct returns a Container with named fields (field_0, field_1, ...).
+        We convert this to a simple tuple maintaining field order.
+        """
+        # Extract values from Container in field order
         values = []
-        for field_construct in self.field_constructs:
-            # For variable-length types (like strings), parse directly from stream
-            # For fixed-length types, we can read the exact number of bytes
-            try:
-                # Try to parse directly from stream (works for all types)
-                field_value = field_construct.parse_stream(stream)
-                values.append(field_value)
-            except Exception as e:
-                # If parse_stream fails, try reading fixed size if available
-                if hasattr(field_construct, 'sizeof'):
-                    try:
-                        size = field_construct.sizeof()
-                        field_bytes = stream.read(size)
-                        values.append(field_construct.parse(field_bytes))
-                    except (AttributeError, TypeError):
-                        # sizeof() failed, re-raise original error
-                        raise e
-                else:
-                    raise e
-        
+        for i in range(len(self.field_constructs)):
+            field_name = f"field_{i}"
+            values.append(obj[field_name])
         return tuple(values)
     
-    def _encode(self, obj: tuple, context, path) -> bytes:
-        """Convert Python tuple to bytes."""
-        import io
-        stream = io.BytesIO()
+    def _encode(self, obj: tuple, context, path) -> dict:
+        """
+        Convert Python tuple to Struct Container dict.
         
-        for i, value in enumerate(obj):
-            field_construct = self.field_constructs[i]
-            stream.write(field_construct.build(value))
-        
-        return stream.getvalue()
+        Converts the tuple to a dict with indexed field names for Struct.
+        """
+        return {f"field_{i}": value for i, value in enumerate(obj)}
 
 
 def LVCluster(*field_constructs: Construct) -> Construct:
     """
-    Create a LabVIEW Cluster construct.
+    Create a LabVIEW Cluster construct using declarative Struct.
     
     Clusters are heterogeneous collections with NO header.
     Data is concatenated directly in order.
     
-    Uses declarative Construct parsing with parse_stream for clean implementation.
+    This implementation uses Construct's Struct internally for declarative
+    field definitions, providing cleaner and more maintainable code.
     
     Args:
         *field_constructs: Variable number of Construct definitions for fields
@@ -387,6 +427,14 @@ def LVCluster(*field_constructs: Construct) -> Construct:
         >>> data = cluster.build(("Hello, LabVIEW!", 0))
         >>> print(data.hex())
         0000000f48656c6c6f2c204c6162564945572100000000
+        
+    Advanced Example with named fields (declarative style):
+        >>> from construct import Struct, Int32ub, Int16ub
+        >>> # You can also use Struct directly for named fields:
+        >>> MyCluster = Struct(
+        ...     "count" / Int32ub,
+        ...     "value" / Int16ub,
+        ... )
     """
     return ClusterAdapter(field_constructs)
 

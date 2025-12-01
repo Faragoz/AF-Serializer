@@ -5,6 +5,7 @@ LabVIEW data serialization library for Python. Serialize Python data structures 
 ## Features
 
 - **Simple API** - Use `lvflatten()` to serialize and `lvunflatten()` to deserialize
+- **Declarative approach** - Uses Construct library's Struct and PrefixedArray for clean, maintainable code
 - **Automatic class detection** - Registry-based automatic class identification during deserialization
 - **Auto-detection of Python types** - Automatically infers LabVIEW types from Python data
 - **3-level inheritance support** - Full support for LabVIEW class hierarchies
@@ -85,12 +86,17 @@ text = lvunflatten(data, LVString)  # Returns "Hello"
 ### Arrays
 
 ```python
-from src import LVArray, LVI32
+from src import LVArray, LVArray1D, LVI32
 
-# 1D Array
+# 1D Array (standard)
 arr = LVArray(LVI32)
 data = arr.build([1, 2, 3])
 parsed = arr.parse(data)  # Returns [1, 2, 3]
+
+# 1D Array (declarative PrefixedArray)
+arr1d = LVArray1D(LVI32)
+data = arr1d.build([1, 2, 3])
+parsed = list(arr1d.parse(data))  # Returns [1, 2, 3]
 
 # 2D Array
 data = arr.build([[1, 2, 3], [4, 5, 6]])
@@ -109,10 +115,21 @@ parsed = arr.parse(data)  # Returns original 3D array
 
 ```python
 from src import LVCluster, LVString, LVI32
+from construct import Struct, Int32ub, Int16ub
 
+# Simple cluster using LVCluster (tuple-based)
 cluster = LVCluster(LVString, LVI32)
 data = cluster.build(("Hello, LabVIEW!", 42))
 parsed = cluster.parse(data)  # Returns ("Hello, LabVIEW!", 42)
+
+# Declarative style using Construct's Struct directly (dict-based)
+DeclarativeCluster = Struct(
+    "name" / LVString,
+    "count" / Int32ub,
+    "value" / Int16ub,
+)
+data = DeclarativeCluster.build({"name": "Hello", "count": 10, "value": 5})
+parsed = DeclarativeCluster.parse(data)  # Returns Container with named fields
 ```
 
 ## Architecture

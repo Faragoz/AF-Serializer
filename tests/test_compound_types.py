@@ -364,3 +364,97 @@ def test_array_of_strings():
     deserialized = array_construct.parse(serialized)
     
     assert deserialized == data
+
+
+# ============================================================================
+# Declarative LVArray1D Tests
+# ============================================================================
+
+def test_lvarray1d_declarative_serialization():
+    """Test declarative LVArray1D with PrefixedArray."""
+    from src import LVArray1D
+    
+    array_construct = LVArray1D(LVI32)
+    data = [1, 2, 3]
+    expected_hex = "00000003000000010000000200000003"
+    
+    result = array_construct.build(data)
+    
+    assert result.hex() == expected_hex
+
+
+def test_lvarray1d_declarative_roundtrip():
+    """Test LVArray1D serialize → deserialize → compare."""
+    from src import LVArray1D
+    
+    array_construct = LVArray1D(LVI32)
+    original = [1, 2, 3]
+    
+    serialized = array_construct.build(original)
+    deserialized = list(array_construct.parse(serialized))  # Convert ListContainer to list
+    
+    assert deserialized == original
+
+
+def test_lvarray1d_declarative_empty():
+    """Test declarative LVArray1D with empty array."""
+    from src import LVArray1D
+    
+    array_construct = LVArray1D(LVI32)
+    data = []
+    expected_hex = "00000000"
+    
+    result = array_construct.build(data)
+    
+    assert result.hex() == expected_hex
+
+
+def test_lvarray1d_declarative_compatible_with_lvarray():
+    """Test that LVArray1D produces same binary as LVArray for 1D arrays."""
+    from src import LVArray1D
+    
+    data = [10, 20, 30, 40, 50]
+    
+    # Both should produce the same binary output
+    lvarray_result = LVArray(LVI32).build(data)
+    lvarray1d_result = LVArray1D(LVI32).build(data)
+    
+    assert lvarray_result == lvarray1d_result
+    
+    # And both should be able to parse each other's output
+    assert LVArray(LVI32).parse(lvarray1d_result) == data
+    assert list(LVArray1D(LVI32).parse(lvarray_result)) == data
+
+
+# ============================================================================
+# Declarative Cluster Tests (Struct-based)
+# ============================================================================
+
+def test_cluster_declarative_struct_based():
+    """Test that Cluster uses declarative Struct internally."""
+    # The LVCluster now uses Struct internally, but maintains tuple interface
+    cluster_construct = LVCluster(LVI32, LVString, LVU16)
+    data = (42, "Hello", 100)
+    
+    serialized = cluster_construct.build(data)
+    deserialized = cluster_construct.parse(serialized)
+    
+    assert deserialized == data
+
+
+def test_cluster_declarative_backward_compatibility():
+    """Test that new declarative Cluster is backward compatible with old serialized data."""
+    # Test with known binary format
+    # Format: I32(42) + String("Hi") + U16(0)
+    # 0000002a + 00000002 + 4869 + 0000
+    expected_hex = "0000002a000000024869"  # Without trailing U16
+    cluster_construct = LVCluster(LVI32, LVString)
+    
+    data = (42, "Hi")
+    result = cluster_construct.build(data)
+    
+    assert result.hex() == expected_hex
+    
+    # Verify round-trip
+    deserialized = cluster_construct.parse(result)
+    assert deserialized == data

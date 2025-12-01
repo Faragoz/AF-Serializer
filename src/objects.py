@@ -1,12 +1,13 @@
 """
 LabVIEW Object Types using Construct Library.
 
-This module implements LabVIEW Object (LVObject) serialization.
+This module implements LabVIEW Object (LVObject) serialization using
+a declarative approach with the Construct library.
 
 LabVIEW Objects contain:
     - NumLevels: Number of inheritance levels
     - ClassName: Fully qualified class names (library + class)
-    - VersionList: Version numbers for each level
+    - VersionList: Version numbers for each level (declarative Struct)
     - ClusterData: Private data clusters for each level
 
 Format Details:
@@ -14,6 +15,11 @@ Format Details:
     - ClassName: Total length (I8) + Pascal Strings + End marker (0x00) + Padding
     - VersionList: 8 bytes per level (4 x I16: major, minor, patch, build)
     - ClusterData: Size (I32) + data for each inheritance level
+
+Declarative Features:
+    - VersionStruct: Declarative Struct for version information
+    - ClusterDataStruct: Declarative struct for size-prefixed cluster data
+    - LVObjectAdapter: Adapter using declarative patterns where possible
 """
 
 from typing import TypeAlias, Annotated, List, Tuple, Optional, Any, Type
@@ -24,10 +30,12 @@ from construct import (
     Int8ub,
     Int16ub,
     Int32ub,
+    Bytes,
     GreedyBytes,
     Construct,
     Adapter,
-    PrefixedArray
+    PrefixedArray,
+    this,
 )
 from .compound_types import LVArray
 
@@ -65,6 +73,13 @@ VersionStruct = Struct(
     "minor" / Int16ub,
     "patch" / Int16ub,
     "build" / Int16ub,
+)
+
+# ClusterData struct for declarative size-prefixed cluster data
+# Format: size(I32) data(Bytes[size])
+ClusterDataStruct = Struct(
+    "size" / Int32ub,
+    "data" / Bytes(this.size),
 )
 
 
@@ -257,21 +272,19 @@ class LVObjectAdapter(Adapter):
         
         # Always read VersionList (8 bytes per level: 4 x I16)
         # LabVIEW always includes versions when num_levels > 0
+        # Uses declarative VersionStruct
         versions = []
         for _ in range(num_levels):
             version_dict = VersionStruct.parse_stream(stream)
             versions.append((version_dict.major, version_dict.minor, version_dict.patch, version_dict.build))
         
-        # Read ClusterData for each level
+        # Read ClusterData for each level using declarative ClusterDataStruct
         cluster_data = []
         for i in range(num_levels):
             try:
-                size = Int32ub.parse_stream(stream)
-                
-                if size > 0:
-                    cluster_data.append(stream.read(size))
-                else:
-                    cluster_data.append(b'')
+                # Use declarative ClusterDataStruct for parsing
+                cluster_container = ClusterDataStruct.parse_stream(stream)
+                cluster_data.append(cluster_container.data)
             except Exception:
                 cluster_data.append(b'')
         
@@ -411,7 +424,7 @@ class LVObjectAdapter(Adapter):
         
         all_clusters_empty = all(len(cb) == 0 for cb in cluster_bytes_list)
 
-        # Always write VersionList for all levels
+        # Always write VersionList for all levels using declarative VersionStruct
         for version in versions:
             if not isinstance(version, tuple) or len(version) != 4:
                 raise ValueError(f"Version must be a 4-tuple (major, minor, patch, build), got {version}")
@@ -419,11 +432,12 @@ class LVObjectAdapter(Adapter):
             stream.write(VersionStruct.build(version_dict))
         
         # Write ClusterData ONLY if at least one cluster has data
+        # Uses declarative ClusterDataStruct for building
         if not all_clusters_empty:
             for cluster_bytes in cluster_bytes_list:
-                stream.write(Int32ub.build(len(cluster_bytes)))
-                if len(cluster_bytes) > 0:
-                    stream.write(cluster_bytes)
+                # Use declarative ClusterDataStruct for building
+                cluster_container = {"size": len(cluster_bytes), "data": cluster_bytes}
+                stream.write(ClusterDataStruct.build(cluster_container))
         
         return stream.getvalue()
 
