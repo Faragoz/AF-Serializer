@@ -33,173 +33,90 @@ LVClusterType: TypeAlias = Annotated[tuple, "LabVIEW Cluster"]
 
 class ArrayAdapter(Construct):
     """
-    Construct for LabVIEW N-Dimensional Array type with auto-dimension detection.
+    Construct for LabVIEW N-Dimensional Array type.
     
-    This construct handles all array dimensions (1D, 2D, 3D, etc.) automatically.
+    This construct handles arrays directly from streams, consuming only the bytes
+    needed for the array data. This makes it self-delimiting for use in clusters
+    with multiple arrays.
     
-    LabVIEW Array Format (with total_size prefix for self-delimiting parsing):
-        [total_size (I32)] [dim0 (I32)] [dim1 (I32)] ... [dimN-1 (I32)] [elements...]
+    LabVIEW Array Format:
+        [dim0 (I32)] [dim1 (I32)] ... [dimN-1 (I32)] [elements...]
         
-    The total_size prefix ensures the array is self-delimiting, allowing multiple
-    arrays to be parsed correctly in a stream (e.g., in clusters).
-    
-    The dimensions are read until: prod(dims) * element_size == remaining_bytes
-    
     For 1D arrays:
-        Format: [total_size (I32)] [num_elements (I32)] [elements...]
-        Example: [1, 2, 3] -> total_size + 0000 0003 0000 0001 0000 0002 0000 0003
+        Format: [num_elements (I32)] [elements...]
+        Example: [1, 2, 3] -> 0000 0003 0000 0001 0000 0002 0000 0003
     
     For ND arrays (2D, 3D, etc.):
-        Format: [total_size (I32)] [dim0 (I32)] [dim1 (I32)] ... [elements...]
-        Example 2D (2×3): total_size + 0000 0002 0000 0003 [6 elements]
-        Example 3D (2×4×4): total_size + 0000 0002 0000 0004 0000 0004 [32 elements]
+        Format: [dim0 (I32)] [dim1 (I32)] ... [elements...]
+        Example 2D (2×3): 0000 0002 0000 0003 [6 elements]
+        Example 3D (2×4×4): 0000 0002 0000 0004 0000 0004 [32 elements]
     
     Elements are stored in row-major order (C-style).
     
-    The dimension detection works as follows:
-    - When building: Analyzes the nested list structure to determine dimensions
-    - When parsing: Reads total_size, then reads exactly that many bytes for array data
+    Dimension handling:
+    - When building: Automatically detects dimensions from the nested list structure
+    - When parsing: Uses num_dims parameter to know how many dimension values to read
+    
+    For multi-dimensional arrays, you must specify num_dims when creating the construct,
+    or use parse() on complete byte arrays where inference is possible.
     """
     
-    def __init__(self, element_type: Construct):
+    def __init__(self, element_type: Construct, num_dims: int = 1):
         """
         Initialize ArrayND construct.
         
         Args:
             element_type: Construct type for array elements
+            num_dims: Number of dimensions to expect when parsing (default: 1)
+                      For 1D arrays, use 1 (default)
+                      For 2D arrays, use 2
+                      For 3D arrays, use 3, etc.
         """
         super().__init__()
         self.element_type = element_type
+        self.num_dims = num_dims
     
     def _parse(self, stream, context, path) -> List:
-        """Parse array from stream with total_size prefix."""
-        # Read total_size (I32) - the number of bytes that follow for the array
-        total_size = Int32ub.parse_stream(stream)
-        
-        # Handle edge case where total_size is 0 (malformed or explicitly empty)
-        if total_size == 0:
-            return []
-        
-        # Read exactly total_size bytes for the array data
-        array_bytes = stream.read(total_size)
-        
-        # Validate we read the expected number of bytes
-        if len(array_bytes) < total_size:
-            raise ValueError(f"Stream truncated: expected {total_size} bytes, got {len(array_bytes)}")
-        
-        # Decode the array bytes
-        return self._decode_array(array_bytes, context, path)
-    
-    def _build(self, obj: List, stream, context, path):
-        """Build array to stream with total_size prefix."""
-        # Encode the array to bytes
-        array_bytes = self._encode_array(obj, context, path)
-        
-        # Write total_size prefix (I32)
-        stream.write(Int32ub.build(len(array_bytes)))
-        
-        # Write array bytes
-        stream.write(array_bytes)
-    
-    def _sizeof(self, context, path):
-        """Size cannot be determined statically."""
-        raise SizeofError("ArrayAdapter size is variable")
-    
-    def _decode_array(self, obj: bytes, context, path) -> List:
-        """Convert bytes to Python list (1D) or nested list (ND)."""
-        import io
+        """Parse array directly from stream, consuming only what's needed."""
         import math
         
-        if len(obj) == 0:
-            return []
-        
-        # Get element size - required for dimension detection
-        element_size = None
-        try:
-            element_size = self.element_type.sizeof()
-        except (TypeError, AttributeError, SizeofError):
-            # Variable size element - fall back to simple 1D parsing
-            pass
-        
-        if element_size is None:
-            # Can't determine dimensions without knowing element size
-            # Fall back to simple 1D array parsing
-            stream = io.BytesIO(obj)
-            count = Int32ub.parse_stream(stream)
-            if count == 0:
-                return []
-            elements = []
-            for _ in range(count):
-                element = self.element_type.parse_stream(stream)
-                elements.append(element)
-            return elements
-        
-        # Read dimensions until prod(dims) * element_size == remaining_bytes
-        # This is the LabVIEW format for ND arrays
+        # Read all dimension values based on num_dims
         dims = []
-        offset = 0
-        total_bytes = len(obj)
+        for _ in range(self.num_dims):
+            dim = Int32ub.parse_stream(stream)
+            dims.append(dim)
         
-        while offset < total_bytes:
-            # Read potential next dimension
-            if offset + 4 > total_bytes:
-                break
-            
-            next_dim = int.from_bytes(obj[offset:offset+4], 'big')
-            potential_dims = dims + [next_dim]
-            
-            # Calculate product of dimensions
-            prod = math.prod(potential_dims) if potential_dims else 0
-            
-            # Calculate remaining bytes after reading this dimension
-            remaining_after = total_bytes - (offset + 4)
-            
-            # Check if prod * element_size matches remaining bytes
-            if prod * element_size == remaining_after:
-                # Found the correct number of dimensions!
-                dims = potential_dims
-                offset += 4
-                break
-            elif prod * element_size > remaining_after:
-                # Too many elements, stop here
-                break
-            else:
-                # Not enough elements yet, add this dimension and continue
-                dims = potential_dims
-                offset += 4
-        
-        if not dims:
-            # No valid dimensions found, return empty
+        # Handle empty array (any dimension is 0)
+        if not dims or any(d == 0 for d in dims):
             return []
         
-        # Parse elements
-        stream = io.BytesIO(obj[offset:])
+        # Calculate total number of elements
         total_elements = math.prod(dims)
+        
+        # Read elements
         elements = []
         for _ in range(total_elements):
             element = self.element_type.parse_stream(stream)
             elements.append(element)
         
-        # Reshape to nested list based on dimensions
+        # Reshape to nested list if multi-dimensional
         if len(dims) == 1:
             return elements
         else:
             return self._reshape_to_nested_list(elements, dims)
     
-    def _encode_array(self, obj: List, context, path) -> bytes:
-        """Convert Python list or nested list to bytes (without total_size prefix)."""
-        import io
-        stream = io.BytesIO()
-        
+    def _build(self, obj: List, stream, context, path):
+        """Build array to stream."""
         if not obj:
-            # Empty array
-            stream.write(Int32ub.build(0))
-            return stream.getvalue()
+            # Empty array - write zeros for all dimensions based on num_dims
+            for _ in range(self.num_dims):
+                stream.write(Int32ub.build(0))
+            return
         
         # Determine dimensions from the nested list
         dims = self._get_dimensions(obj)
         
-        # Write all dimension sizes (no num_dims header in LabVIEW format)
+        # Write all dimension sizes
         for dim_size in dims:
             stream.write(Int32ub.build(dim_size))
         
@@ -207,8 +124,10 @@ class ArrayAdapter(Construct):
         flat_elements = self._flatten_nested_list(obj)
         for element in flat_elements:
             stream.write(self.element_type.build(element))
-        
-        return stream.getvalue()
+    
+    def _sizeof(self, context, path):
+        """Size cannot be determined statically."""
+        raise SizeofError("ArrayAdapter size is variable")
     
     def _get_dimensions(self, obj: List) -> List[int]:
         """Get dimensions of a list or nested list."""
@@ -268,51 +187,50 @@ class ArrayAdapter(Construct):
         return result
 
 
-def LVArray(element_type):
+def LVArray(element_type, num_dims: int = 1):
     """
-    Create a LabVIEW Array construct with automatic dimension detection.
+    Create a LabVIEW Array construct.
     
-    This is a universal array type that handles 1D, 2D, 3D, and higher 
-    dimensional arrays automatically based on the data structure.
+    This creates an array construct that handles serialization and deserialization
+    of LabVIEW arrays. It reads directly from streams, making it self-delimiting
+    for use in clusters with multiple arrays.
     
-    LabVIEW Array Format (self-delimiting):
-        [total_size (I32)] [dim0 (I32)] [dim1 (I32)] ... [dimN-1 (I32)] [elements...]
-        
-    The total_size prefix makes the array self-delimiting, allowing multiple
-    arrays to be correctly parsed in sequence (e.g., in clusters or streams).
-    
-    Dimensions are detected by reading until: prod(dims) * element_size == remaining_bytes
+    LabVIEW Array Format:
+        [dim0 (I32)] [dim1 (I32)] ... [dimN-1 (I32)] [elements...]
     
     Args:
         element_type: Construct type for array elements
+        num_dims: Number of dimensions (default: 1). Required for correct parsing
+                  of multi-dimensional arrays when reading from streams.
     
     Returns:
-        Construct that can serialize/deserialize arrays of any dimension
+        Construct that can serialize/deserialize arrays
     
     Examples:
         1D Array:
         >>> from src import LVArray, LVI32
         >>> arr = LVArray(LVI32)
         >>> data = arr.build([1, 2, 3])
-        >>> # Format: total_size (16) + count (3) + elements
+        >>> print(data.hex())
+        00000003000000010000000200000003
         >>> arr.parse(data)
         [1, 2, 3]
         
         2D Array (2×3):
-        >>> arr = LVArray(LVI32)
+        >>> arr = LVArray(LVI32, num_dims=2)
         >>> data = arr.build([[1, 2, 3], [4, 5, 6]])
-        >>> # Format: total_size + dim0 (2) + dim1 (3) + 6 elements
+        >>> print(data.hex())
+        0000000200000003000000010000000200000003000000040000000500000006
         >>> arr.parse(data)
         [[1, 2, 3], [4, 5, 6]]
         
-        Multiple Arrays in Cluster (self-delimiting):
-        >>> arr1, arr2 = LVArray(LVI32), LVArray(LVI32)
-        >>> cluster = LVCluster(arr1, arr2)
+        Multiple Arrays in Cluster:
+        >>> cluster = LVCluster(LVArray(LVI32), LVArray(LVI32))
         >>> data = cluster.build(([1, 2, 3], [4, 5, 6]))
         >>> cluster.parse(data)
         ([1, 2, 3], [4, 5, 6])
     """
-    return ArrayAdapter(element_type)
+    return ArrayAdapter(element_type, num_dims)
 
 
 # ============================================================================

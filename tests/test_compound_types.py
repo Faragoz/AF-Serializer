@@ -21,11 +21,10 @@ from src import (
 def test_array1d_serialization_three_elements():
     """Validate Array1D serialization against real LabVIEW hex output."""
     # Array of 3 I32 elements: [1, 2, 3]
-    # Format: [total_size (I32)] [count (I32)] [elements...]
-    # Expected: 0000 0010 (16 bytes) 0000 0003 0000 0001 0000 0002 0000 0003
+    # Expected: 0000 0003 0000 0001 0000 0002 0000 0003
     array_construct = LVArray(LVI32)
     data = [1, 2, 3]
-    expected_hex = "0000001000000003000000010000000200000003"
+    expected_hex = "00000003000000010000000200000003"
     
     result = array_construct.build(data)
     
@@ -47,9 +46,7 @@ def test_array1d_empty_array():
     """Test Array1D with empty array."""
     array_construct = LVArray(LVI32)
     data = []
-    # Format: [total_size (I32)=4] [count (I32)=0]
-    # Empty array has total_size=4 for the count field
-    expected_hex = "0000000400000000"
+    expected_hex = "00000000"
     
     result = array_construct.build(data)
     
@@ -60,8 +57,7 @@ def test_array1d_single_element():
     """Test Array1D with single element."""
     array_construct = LVArray(LVI32)
     data = [42]
-    # Format: [total_size (I32)=8] [count (I32)=1] [element (I32)]
-    expected_hex = "00000008000000010000002a"
+    expected_hex = "000000010000002a"
     
     result = array_construct.build(data)
     
@@ -92,31 +88,28 @@ def test_array1d_roundtrip_parametrized(data):
 def test_array2d_serialization_2x3_matrix():
     """Validate Array2D serialization for 2×3 matrix."""
     # 2×3 matrix: [[1, 2, 3], [4, 5, 6]]
-    # Format: [total_size (I32)] [dim0=2 (I32)] [dim1=3 (I32)] [6 elements]
-    array_construct = LVArray(LVI32)
+    # Format: [dim0=2 (I32)] [dim1=3 (I32)] [6 elements]
+    array_construct = LVArray(LVI32, num_dims=2)
     data = [[1, 2, 3], [4, 5, 6]]
     
     result = array_construct.build(data)
     
-    # Check total_size prefix
-    assert result[:4].hex() == "00000020"  # total_size = 32 bytes (8 dim bytes + 24 element bytes)
-    
-    # Check header (dimensions only, no num_dims) - offset by 4 for total_size
-    assert result[4:8].hex() == "00000002"  # dim0 = 2
-    assert result[8:12].hex() == "00000003"  # dim1 = 3
+    # Check header (dimensions only, no num_dims)
+    assert result[:4].hex() == "00000002"  # dim0 = 2
+    assert result[4:8].hex() == "00000003"  # dim1 = 3
     
     # Check elements
-    assert result[12:16].hex() == "00000001"  # element 0
-    assert result[16:20].hex() == "00000002"  # element 1
-    assert result[20:24].hex() == "00000003"  # element 2
-    assert result[24:28].hex() == "00000004"  # element 3
-    assert result[28:32].hex() == "00000005"  # element 4
-    assert result[32:36].hex() == "00000006"  # element 5
+    assert result[8:12].hex() == "00000001"  # element 0
+    assert result[12:16].hex() == "00000002"  # element 1
+    assert result[16:20].hex() == "00000003"  # element 2
+    assert result[20:24].hex() == "00000004"  # element 3
+    assert result[24:28].hex() == "00000005"  # element 4
+    assert result[28:32].hex() == "00000006"  # element 5
 
 
 def test_array2d_deserialization_roundtrip():
     """Test Array2D serialize → deserialize → compare."""
-    array_construct = LVArray(LVI32)
+    array_construct = LVArray(LVI32, num_dims=2)
     original = [[1, 2, 3], [4, 5, 6]]
     
     serialized = array_construct.build(original)
@@ -127,7 +120,7 @@ def test_array2d_deserialization_roundtrip():
 
 def test_array2d_single_row():
     """Test Array2D with single row."""
-    array_construct = LVArray(LVI32)
+    array_construct = LVArray(LVI32, num_dims=2)
     data = [[1, 2, 3]]
     
     serialized = array_construct.build(data)
@@ -143,7 +136,7 @@ def test_array2d_single_row():
 ])
 def test_array2d_roundtrip_parametrized(data):
     """Test Array2D roundtrip with various data."""
-    array_construct = LVArray(LVI32)
+    array_construct = LVArray(LVI32, num_dims=2)
     
     serialized = array_construct.build(data)
     deserialized = array_construct.parse(serialized)
@@ -158,34 +151,31 @@ def test_array2d_roundtrip_parametrized(data):
 def test_array3d_serialization_2x2x2():
     """Validate Array3D serialization for 2×2×2 cube."""
     # 2×2×2 cube
-    # Format: [total_size (I32)] [dim0=2 (I32)] [dim1=2 (I32)] [dim2=2 (I32)] [8 elements]
-    array_construct = LVArray(LVI32)
+    # Format: [dim0=2 (I32)] [dim1=2 (I32)] [dim2=2 (I32)] [8 elements]
+    array_construct = LVArray(LVI32, num_dims=3)
     data = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
     
     result = array_construct.build(data)
     
-    # Check total_size prefix - 12 bytes for dims + 32 bytes for elements = 44 bytes
-    assert result[:4].hex() == "0000002c"  # total_size = 44 bytes
-    
-    # Check header (dimensions only, no num_dims) - offset by 4 for total_size
-    assert result[4:8].hex() == "00000002"  # dim0 = 2
-    assert result[8:12].hex() == "00000002"  # dim1 = 2
-    assert result[12:16].hex() == "00000002"  # dim2 = 2
+    # Check header (dimensions only, no num_dims)
+    assert result[:4].hex() == "00000002"  # dim0 = 2
+    assert result[4:8].hex() == "00000002"  # dim1 = 2
+    assert result[8:12].hex() == "00000002"  # dim2 = 2
     
     # Check elements (row-major order)
-    assert result[16:20].hex() == "00000001"  # element 0
-    assert result[20:24].hex() == "00000002"  # element 1
-    assert result[24:28].hex() == "00000003"  # element 2
-    assert result[28:32].hex() == "00000004"  # element 3
-    assert result[32:36].hex() == "00000005"  # element 4
-    assert result[36:40].hex() == "00000006"  # element 5
-    assert result[40:44].hex() == "00000007"  # element 6
-    assert result[44:48].hex() == "00000008"  # element 7
+    assert result[12:16].hex() == "00000001"  # element 0
+    assert result[16:20].hex() == "00000002"  # element 1
+    assert result[20:24].hex() == "00000003"  # element 2
+    assert result[24:28].hex() == "00000004"  # element 3
+    assert result[28:32].hex() == "00000005"  # element 4
+    assert result[32:36].hex() == "00000006"  # element 5
+    assert result[36:40].hex() == "00000007"  # element 6
+    assert result[40:44].hex() == "00000008"  # element 7
 
 
 def test_array3d_deserialization_roundtrip():
     """Test Array3D serialize → deserialize → compare."""
-    array_construct = LVArray(LVI32)
+    array_construct = LVArray(LVI32, num_dims=3)
     original = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
     
     serialized = array_construct.build(original)
@@ -196,7 +186,7 @@ def test_array3d_deserialization_roundtrip():
 
 def test_array3d_2x4x4_roundtrip():
     """Test Array3D with 2×4×4 shape (from user example)."""
-    array_construct = LVArray(LVI32)
+    array_construct = LVArray(LVI32, num_dims=3)
     # Create 2×4×4 array with specific values
     data = [
         [[7, 0, 0, 0], [8, 0, 0, 0], [0, 0, 3, 0], [0, 0, 0, 5]],
@@ -205,16 +195,10 @@ def test_array3d_2x4x4_roundtrip():
     
     serialized = array_construct.build(data)
     
-    # Check total_size prefix
-    # 3 dims × 4 bytes = 12 bytes for dimensions
-    # 2×4×4 = 32 elements × 4 bytes = 128 bytes for elements
-    # Total = 12 + 128 = 140 bytes
-    assert serialized[:4].hex() == "0000008c"  # total_size = 140 bytes
-    
-    # Check header (dimensions only, no num_dims) - offset by 4 for total_size
-    assert serialized[4:8].hex() == "00000002"  # dim0 = 2
-    assert serialized[8:12].hex() == "00000004"  # dim1 = 4
-    assert serialized[12:16].hex() == "00000004"  # dim2 = 4
+    # Check header (dimensions only, no num_dims)
+    assert serialized[:4].hex() == "00000002"  # dim0 = 2
+    assert serialized[4:8].hex() == "00000004"  # dim1 = 4
+    assert serialized[8:12].hex() == "00000004"  # dim2 = 4
     
     # Roundtrip
     deserialized = array_construct.parse(serialized)
@@ -228,7 +212,7 @@ def test_array3d_2x4x4_roundtrip():
 ])
 def test_array3d_roundtrip_parametrized(data):
     """Test Array3D roundtrip with various shapes."""
-    array_construct = LVArray(LVI32)
+    array_construct = LVArray(LVI32, num_dims=3)
     
     serialized = array_construct.build(data)
     deserialized = array_construct.parse(serialized)
@@ -331,14 +315,14 @@ def test_nested_array_in_cluster():
     array_data = [1, 2, 3]
     array_bytes = array_construct.build(array_data)
     
-    # Verify array serialization works - first 4 bytes are total_size
-    assert array_bytes[:4].hex() == "00000010"  # total_size = 16 bytes
+    # Verify array serialization works
+    assert array_bytes[:4].hex() == "00000003"
 
 
 def test_multiple_arrays_in_cluster():
-    """Test Cluster containing multiple arrays (self-delimiting arrays fix)."""
-    # This tests the key feature: multiple arrays in a cluster can now be
-    # correctly parsed because each array includes a total_size prefix
+    """Test Cluster containing multiple arrays (self-delimiting arrays)."""
+    # This tests the key feature: multiple 1D arrays in a cluster can now be
+    # correctly parsed because the array reads directly from stream
     cluster_construct = LVCluster(LVArray(LVI32), LVArray(LVI32))
     data = ([1, 2, 3], [4, 5, 6])
     
