@@ -10,6 +10,7 @@ Supported Types:
     - LVArray: Universal array type that auto-detects dimensions (1D, 2D, 3D, etc.)
     - Cluster: Heterogeneous collections (no header, direct concatenation)
 """
+import math
 from typing import TypeAlias, Annotated, List, Any, Sequence
 from construct import (
     Int32ub,
@@ -78,8 +79,6 @@ class ArrayAdapter(Construct):
     
     def _parse(self, stream, context, path) -> List:
         """Parse array directly from stream, consuming only what's needed."""
-        import math
-        
         # Read all dimension values based on num_dims
         dims = []
         for _ in range(self.num_dims):

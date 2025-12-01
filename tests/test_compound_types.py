@@ -321,8 +321,9 @@ def test_nested_array_in_cluster():
 
 def test_multiple_arrays_in_cluster():
     """Test Cluster containing multiple arrays (self-delimiting arrays)."""
-    # This tests the key feature: multiple 1D arrays in a cluster can now be
-    # correctly parsed because the array reads directly from stream
+    # This tests the key feature: multiple arrays in a cluster can now be
+    # correctly parsed because each array reads only its required bytes from
+    # the stream instead of consuming all remaining bytes
     cluster_construct = LVCluster(LVArray(LVI32), LVArray(LVI32))
     data = ([1, 2, 3], [4, 5, 6])
     
