@@ -76,11 +76,16 @@ class ArrayAdapter(Construct):
         # Read total_size (I32) - the number of bytes that follow for the array
         total_size = Int32ub.parse_stream(stream)
         
+        # Handle edge case where total_size is 0 (malformed or explicitly empty)
         if total_size == 0:
             return []
         
         # Read exactly total_size bytes for the array data
         array_bytes = stream.read(total_size)
+        
+        # Validate we read the expected number of bytes
+        if len(array_bytes) < total_size:
+            raise ValueError(f"Stream truncated: expected {total_size} bytes, got {len(array_bytes)}")
         
         # Decode the array bytes
         return self._decode_array(array_bytes, context, path)

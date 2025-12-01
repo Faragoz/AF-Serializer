@@ -206,7 +206,9 @@ def test_array3d_2x4x4_roundtrip():
     serialized = array_construct.build(data)
     
     # Check total_size prefix
-    # 3 dims * 4 bytes = 12 bytes + 32 elements * 4 bytes = 128 bytes = 140 bytes total
+    # 3 dims × 4 bytes = 12 bytes for dimensions
+    # 2×4×4 = 32 elements × 4 bytes = 128 bytes for elements
+    # Total = 12 + 128 = 140 bytes
     assert serialized[:4].hex() == "0000008c"  # total_size = 140 bytes
     
     # Check header (dimensions only, no num_dims) - offset by 4 for total_size
