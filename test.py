@@ -5,8 +5,9 @@ The key features are:
 1. lvflatten(obj) - Serialize any @lvclass instance to bytes
 2. lvunflatten(data) - Automatically identify and populate the correct class
 """
+from construct import Numpy
 
-from src import lvclass, lvflatten, lvunflatten, LVU16, LVI32, LVString
+from src import lvclass, lvflatten, lvunflatten, LVU16, LVI32, LVString, LVBoolean, LVDouble, LVArray, LVU8
 
 
 # Define LabVIEW class hierarchy using @lvclass decorator
@@ -51,6 +52,53 @@ assert isinstance(restored, EchoMsg)
 assert restored.message == "Hello World!"
 assert restored.code == 42
 print("✓ Roundtrip successful!")
+
+# ============================================================================
+# Example: Simple deserialization from HEX data
+# ============================================================================
+print("=== Example: Simple deserialization from HEX data ===")
+
+@lvclass(version=(1, 0, 0, 6))
+class Test:
+    pass
+
+@lvclass(version=(1, 0, 0, 4))
+class Child(Test):
+    boolean: LVBoolean
+    number: LVI32
+    double: LVDouble
+    text: LVString
+    number_array: LVArray(LVU8)
+    string_array: LVArray(LVString)
+
+data = bytes.fromhex("0000 0002 0F0D 4368 696C 642E 6C76 636C 6173 7300 0001 0000 0000 0004 0001 0000 0000 0006 0000 0000 0000 0019 0000 0002 FF00 0000 0000 0000 0000 0000 0000 0000 0000 0000 00")
+data = bytes.fromhex("0000 0002 0F0D 4368 696C 642E 6C76 636C 6173 7300 0001 0000 0000 0004 0001 0000 0000 0006 0000 0000 0000 0042 0100 0002 6640 091E B851 EB85 1F00 0000 0C48 656C 6C6F 2050 7974 686F 6E00 0000 0336 374A 0000 0003 0000 0005 4861 62ED 6100 0000 0375 F161 0000 0006 7665 7A2E 2E2E ")
+print(f"Serialized bytes: {data.hex()}")
+
+"""child = Child()
+child.boolean = True
+child.number = 614
+child.double = 3.14
+child.text = "Hello Python"
+child.number_array = [54,55,74]
+child.string_array = ["Había","uña","vez..."]
+data = lvflatten(child)
+print(f"Serialized bytes: {data.hex()}")"""
+
+# Deserialize with lvunflatten() - NO parameters needed!
+restored = lvunflatten(data)
+print(f"Restored type: {type(restored).__name__}")
+#print(f"{restored.__annotations__}")
+print(f"Boolean: {restored.boolean}")
+print(f"Number: {restored.number}")
+print(f"Double: {restored.double}")
+print(f"Text: {restored.text}")
+print(f"Number Array: {restored.number_array}")
+print(f"String Array: {restored.string_array}")
+
+# Verify
+assert isinstance(restored, Child)
+print("✓ Deserialization successful!")
 
 # ============================================================================
 # Example: 3-level inheritance
