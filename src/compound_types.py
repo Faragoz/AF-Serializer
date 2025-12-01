@@ -31,44 +31,76 @@ LVClusterType: TypeAlias = Annotated[tuple, "LabVIEW Cluster"]
 # ============================================================================
 
 
-class ArrayAdapter(Adapter):
+class ArrayAdapter(Construct):
     """
-    Adapter for LabVIEW N-Dimensional Array type with auto-dimension detection.
+    Construct for LabVIEW N-Dimensional Array type with auto-dimension detection.
     
-    This adapter handles all array dimensions (1D, 2D, 3D, etc.) automatically.
+    This construct handles all array dimensions (1D, 2D, 3D, etc.) automatically.
     
-    LabVIEW Array Format:
-        [dim0 (I32)] [dim1 (I32)] ... [dimN-1 (I32)] [elements...]
+    LabVIEW Array Format (with total_size prefix for self-delimiting parsing):
+        [total_size (I32)] [dim0 (I32)] [dim1 (I32)] ... [dimN-1 (I32)] [elements...]
         
+    The total_size prefix ensures the array is self-delimiting, allowing multiple
+    arrays to be parsed correctly in a stream (e.g., in clusters).
+    
     The dimensions are read until: prod(dims) * element_size == remaining_bytes
     
     For 1D arrays:
-        Format: [num_elements (I32)] [elements...]
-        Example: [1, 2, 3] -> 0000 0003 0000 0001 0000 0002 0000 0003
+        Format: [total_size (I32)] [num_elements (I32)] [elements...]
+        Example: [1, 2, 3] -> total_size + 0000 0003 0000 0001 0000 0002 0000 0003
     
     For ND arrays (2D, 3D, etc.):
-        Format: [dim0 (I32)] [dim1 (I32)] ... [elements...]
-        Example 2D (2×3): 0000 0002 0000 0003 [6 elements]
-        Example 3D (2×4×4): 0000 0002 0000 0004 0000 0004 [32 elements]
+        Format: [total_size (I32)] [dim0 (I32)] [dim1 (I32)] ... [elements...]
+        Example 2D (2×3): total_size + 0000 0002 0000 0003 [6 elements]
+        Example 3D (2×4×4): total_size + 0000 0002 0000 0004 0000 0004 [32 elements]
     
     Elements are stored in row-major order (C-style).
     
     The dimension detection works as follows:
     - When building: Analyzes the nested list structure to determine dimensions
-    - When parsing: Reads dimensions until prod(dims) * element_size == remaining_bytes
+    - When parsing: Reads total_size, then reads exactly that many bytes for array data
     """
     
     def __init__(self, element_type: Construct):
         """
-        Initialize ArrayND adapter.
+        Initialize ArrayND construct.
         
         Args:
             element_type: Construct type for array elements
         """
+        super().__init__()
         self.element_type = element_type
-        super().__init__(GreedyBytes)
     
-    def _decode(self, obj: bytes, context, path) -> List:
+    def _parse(self, stream, context, path) -> List:
+        """Parse array from stream with total_size prefix."""
+        # Read total_size (I32) - the number of bytes that follow for the array
+        total_size = Int32ub.parse_stream(stream)
+        
+        if total_size == 0:
+            return []
+        
+        # Read exactly total_size bytes for the array data
+        array_bytes = stream.read(total_size)
+        
+        # Decode the array bytes
+        return self._decode_array(array_bytes, context, path)
+    
+    def _build(self, obj: List, stream, context, path):
+        """Build array to stream with total_size prefix."""
+        # Encode the array to bytes
+        array_bytes = self._encode_array(obj, context, path)
+        
+        # Write total_size prefix (I32)
+        stream.write(Int32ub.build(len(array_bytes)))
+        
+        # Write array bytes
+        stream.write(array_bytes)
+    
+    def _sizeof(self, context, path):
+        """Size cannot be determined statically."""
+        raise SizeofError("ArrayAdapter size is variable")
+    
+    def _decode_array(self, obj: bytes, context, path) -> List:
         """Convert bytes to Python list (1D) or nested list (ND)."""
         import io
         import math
@@ -149,8 +181,8 @@ class ArrayAdapter(Adapter):
         else:
             return self._reshape_to_nested_list(elements, dims)
     
-    def _encode(self, obj: List, context, path) -> bytes:
-        """Convert Python list or nested list to bytes."""
+    def _encode_array(self, obj: List, context, path) -> bytes:
+        """Convert Python list or nested list to bytes (without total_size prefix)."""
         import io
         stream = io.BytesIO()
         
@@ -238,9 +270,12 @@ def LVArray(element_type):
     This is a universal array type that handles 1D, 2D, 3D, and higher 
     dimensional arrays automatically based on the data structure.
     
-    LabVIEW Array Format:
-        [dim0 (I32)] [dim1 (I32)] ... [dimN-1 (I32)] [elements...]
+    LabVIEW Array Format (self-delimiting):
+        [total_size (I32)] [dim0 (I32)] [dim1 (I32)] ... [dimN-1 (I32)] [elements...]
         
+    The total_size prefix makes the array self-delimiting, allowing multiple
+    arrays to be correctly parsed in sequence (e.g., in clusters or streams).
+    
     Dimensions are detected by reading until: prod(dims) * element_size == remaining_bytes
     
     Args:
@@ -254,26 +289,23 @@ def LVArray(element_type):
         >>> from src import LVArray, LVI32
         >>> arr = LVArray(LVI32)
         >>> data = arr.build([1, 2, 3])
-        >>> print(data.hex())
-        00000003000000010000000200000003
+        >>> # Format: total_size (16) + count (3) + elements
         >>> arr.parse(data)
         [1, 2, 3]
         
         2D Array (2×3):
         >>> arr = LVArray(LVI32)
         >>> data = arr.build([[1, 2, 3], [4, 5, 6]])
-        >>> print(data.hex())
-        0000000200000003000000010000000200000003000000040000000500000006
+        >>> # Format: total_size + dim0 (2) + dim1 (3) + 6 elements
         >>> arr.parse(data)
         [[1, 2, 3], [4, 5, 6]]
         
-        3D Array (2×4×4):
-        >>> arr = LVArray(LVI32)
-        >>> data_3d = [[[7,0,0,0], [8,0,0,0], [0,0,3,0], [0,0,0,5]],
-        ...            [[0,0,0,0], [0,0,0,0], [0,0,0,6], [0,0,0,0]]]
-        >>> serialized = arr.build(data_3d)
-        >>> print(serialized[:12].hex())  # First 3 dimension values
-        000000020000000400000004
+        Multiple Arrays in Cluster (self-delimiting):
+        >>> arr1, arr2 = LVArray(LVI32), LVArray(LVI32)
+        >>> cluster = LVCluster(arr1, arr2)
+        >>> data = cluster.build(([1, 2, 3], [4, 5, 6]))
+        >>> cluster.parse(data)
+        ([1, 2, 3], [4, 5, 6])
     """
     return ArrayAdapter(element_type)
 
