@@ -89,7 +89,7 @@ def test_array2d_serialization_2x3_matrix():
     """Validate Array2D serialization for 2×3 matrix."""
     # 2×3 matrix: [[1, 2, 3], [4, 5, 6]]
     # Format: [dim0=2 (I32)] [dim1=3 (I32)] [6 elements]
-    array_construct = LVArray(LVI32, num_dims=2)
+    array_construct = LVArray(LVI32)
     data = [[1, 2, 3], [4, 5, 6]]
     
     result = array_construct.build(data)
@@ -109,7 +109,7 @@ def test_array2d_serialization_2x3_matrix():
 
 def test_array2d_deserialization_roundtrip():
     """Test Array2D serialize → deserialize → compare."""
-    array_construct = LVArray(LVI32, num_dims=2)
+    array_construct = LVArray(LVI32)
     original = [[1, 2, 3], [4, 5, 6]]
     
     serialized = array_construct.build(original)
@@ -120,7 +120,7 @@ def test_array2d_deserialization_roundtrip():
 
 def test_array2d_single_row():
     """Test Array2D with single row."""
-    array_construct = LVArray(LVI32, num_dims=2)
+    array_construct = LVArray(LVI32)
     data = [[1, 2, 3]]
     
     serialized = array_construct.build(data)
@@ -136,7 +136,7 @@ def test_array2d_single_row():
 ])
 def test_array2d_roundtrip_parametrized(data):
     """Test Array2D roundtrip with various data."""
-    array_construct = LVArray(LVI32, num_dims=2)
+    array_construct = LVArray(LVI32)
     
     serialized = array_construct.build(data)
     deserialized = array_construct.parse(serialized)
@@ -152,7 +152,7 @@ def test_array3d_serialization_2x2x2():
     """Validate Array3D serialization for 2×2×2 cube."""
     # 2×2×2 cube
     # Format: [dim0=2 (I32)] [dim1=2 (I32)] [dim2=2 (I32)] [8 elements]
-    array_construct = LVArray(LVI32, num_dims=3)
+    array_construct = LVArray(LVI32)
     data = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
     
     result = array_construct.build(data)
@@ -175,7 +175,7 @@ def test_array3d_serialization_2x2x2():
 
 def test_array3d_deserialization_roundtrip():
     """Test Array3D serialize → deserialize → compare."""
-    array_construct = LVArray(LVI32, num_dims=3)
+    array_construct = LVArray(LVI32)
     original = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
     
     serialized = array_construct.build(original)
@@ -186,7 +186,7 @@ def test_array3d_deserialization_roundtrip():
 
 def test_array3d_2x4x4_roundtrip():
     """Test Array3D with 2×4×4 shape (from user example)."""
-    array_construct = LVArray(LVI32, num_dims=3)
+    array_construct = LVArray(LVI32)
     # Create 2×4×4 array with specific values
     data = [
         [[7, 0, 0, 0], [8, 0, 0, 0], [0, 0, 3, 0], [0, 0, 0, 5]],
@@ -212,7 +212,7 @@ def test_array3d_2x4x4_roundtrip():
 ])
 def test_array3d_roundtrip_parametrized(data):
     """Test Array3D roundtrip with various shapes."""
-    array_construct = LVArray(LVI32, num_dims=3)
+    array_construct = LVArray(LVI32)
     
     serialized = array_construct.build(data)
     deserialized = array_construct.parse(serialized)

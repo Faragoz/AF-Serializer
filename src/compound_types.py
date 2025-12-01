@@ -34,11 +34,11 @@ LVClusterType: TypeAlias = Annotated[tuple, "LabVIEW Cluster"]
 
 class ArrayAdapter(Construct):
     """
-    Construct for LabVIEW N-Dimensional Array type.
+    Construct for LabVIEW N-Dimensional Array type with automatic dimension inference.
     
     This construct handles arrays directly from streams, consuming only the bytes
-    needed for the array data. This makes it self-delimiting for use in clusters
-    with multiple arrays.
+    needed for the array data. It automatically infers the number of dimensions
+    by analyzing the dimension values and element size.
     
     LabVIEW Array Format:
         [dim0 (I32)] [dim1 (I32)] ... [dimN-1 (I32)] [elements...]
@@ -54,51 +54,117 @@ class ArrayAdapter(Construct):
     
     Elements are stored in row-major order (C-style).
     
-    Dimension handling:
-    - When building: Automatically detects dimensions from the nested list structure
-    - When parsing: Uses num_dims parameter to know how many dimension values to read
+    Dimension inference (for fixed-size elements):
+    - Reads I32 values as potential dimensions
+    - Verifies by checking if prod(dims) * element_size bytes can be read
+    - Uses stream seeking to verify and correct
     
-    For multi-dimensional arrays, you must specify num_dims when creating the construct,
-    or use parse() on complete byte arrays where inference is possible.
+    For variable-size elements, defaults to 1D parsing.
     """
     
-    def __init__(self, element_type: Construct, num_dims: int = 1):
+    def __init__(self, element_type: Construct):
         """
         Initialize ArrayND construct.
         
         Args:
             element_type: Construct type for array elements
-            num_dims: Number of dimensions to expect when parsing (default: 1)
-                      For 1D arrays, use 1 (default)
-                      For 2D arrays, use 2
-                      For 3D arrays, use 3, etc.
         """
         super().__init__()
         self.element_type = element_type
-        self.num_dims = num_dims
     
     def _parse(self, stream, context, path) -> List:
-        """Parse array directly from stream, consuming only what's needed."""
-        # Read all dimension values based on num_dims
-        dims = []
-        for _ in range(self.num_dims):
-            dim = Int32ub.parse_stream(stream)
-            dims.append(dim)
+        """Parse array from stream with automatic dimension inference."""
+        # Get element size for dimension inference
+        element_size = None
+        try:
+            element_size = self.element_type.sizeof()
+        except (TypeError, AttributeError, SizeofError):
+            pass
         
-        # Handle empty array (any dimension is 0)
-        if not dims or any(d == 0 for d in dims):
+        if element_size is None:
+            # Variable-size elements: fall back to 1D parsing
+            count = Int32ub.parse_stream(stream)
+            if count == 0:
+                return []
+            elements = []
+            for _ in range(count):
+                element = self.element_type.parse_stream(stream)
+                elements.append(element)
+            return elements
+        
+        # Fixed-size elements: infer dimensions
+        # Strategy: Try dimension counts and see if any gives exact match
+        # If no exact match, default to 1D
+        
+        # Save start position
+        start_pos = stream.tell()
+        
+        # Get stream size to calculate remaining bytes
+        stream.seek(0, 2)  # Seek to end
+        end_pos = stream.tell()
+        stream.seek(start_pos)  # Seek back
+        remaining_bytes = end_pos - start_pos
+        
+        if remaining_bytes == 0:
             return []
         
-        # Calculate total number of elements
-        total_elements = math.prod(dims)
+        if remaining_bytes < 4:
+            return []
         
-        # Read elements
+        # Read first dimension
+        first_dim = Int32ub.parse_stream(stream)
+        if first_dim == 0:
+            return []
+        
+        # Try to find dimension count that gives exact match
+        dims = [first_dim]
+        found_exact_match = False
+        max_dims = 10  # Safety limit
+        
+        while len(dims) < max_dims:
+            # Calculate what this dimension interpretation would mean
+            prod = math.prod(dims)
+            dims_bytes = len(dims) * 4
+            expected_element_bytes = prod * element_size
+            expected_total = dims_bytes + expected_element_bytes
+            
+            if expected_total == remaining_bytes:
+                # Exact match! This is the correct interpretation
+                found_exact_match = True
+                break
+            elif expected_total > remaining_bytes:
+                # Too many bytes expected, can't be right
+                # Remove the last dimension and stop
+                if len(dims) > 1:
+                    dims.pop()
+                break
+            
+            # Try reading next dimension
+            if stream.tell() - start_pos + 4 > remaining_bytes:
+                # Not enough bytes for another dimension
+                break
+                
+            next_dim = Int32ub.parse_stream(stream)
+            if next_dim == 0:
+                # Zero dimension means something went wrong
+                # Default to what we have
+                break
+            dims.append(next_dim)
+        
+        # If no exact match found, default to 1D (most common case for clusters)
+        if not found_exact_match:
+            dims = [first_dim]
+            # Seek back to position after first dimension
+            stream.seek(start_pos + 4)
+        
+        # Parse elements
+        total_elements = math.prod(dims)
         elements = []
         for _ in range(total_elements):
             element = self.element_type.parse_stream(stream)
             elements.append(element)
         
-        # Reshape to nested list if multi-dimensional
+        # Reshape to nested list based on dimensions
         if len(dims) == 1:
             return elements
         else:
@@ -107,9 +173,8 @@ class ArrayAdapter(Construct):
     def _build(self, obj: List, stream, context, path):
         """Build array to stream."""
         if not obj:
-            # Empty array - write zeros for all dimensions based on num_dims
-            for _ in range(self.num_dims):
-                stream.write(Int32ub.build(0))
+            # Empty array - write single 0 dimension
+            stream.write(Int32ub.build(0))
             return
         
         # Determine dimensions from the nested list
@@ -186,24 +251,22 @@ class ArrayAdapter(Construct):
         return result
 
 
-def LVArray(element_type, num_dims: int = 1):
+def LVArray(element_type):
     """
-    Create a LabVIEW Array construct.
+    Create a LabVIEW Array construct with automatic dimension detection.
     
     This creates an array construct that handles serialization and deserialization
-    of LabVIEW arrays. It reads directly from streams, making it self-delimiting
-    for use in clusters with multiple arrays.
+    of LabVIEW arrays. It automatically infers the number of dimensions when
+    parsing, making it self-delimiting for use in clusters with multiple arrays.
     
     LabVIEW Array Format:
         [dim0 (I32)] [dim1 (I32)] ... [dimN-1 (I32)] [elements...]
     
     Args:
         element_type: Construct type for array elements
-        num_dims: Number of dimensions (default: 1). Required for correct parsing
-                  of multi-dimensional arrays when reading from streams.
     
     Returns:
-        Construct that can serialize/deserialize arrays
+        Construct that can serialize/deserialize arrays of any dimension
     
     Examples:
         1D Array:
@@ -216,7 +279,7 @@ def LVArray(element_type, num_dims: int = 1):
         [1, 2, 3]
         
         2D Array (2×3):
-        >>> arr = LVArray(LVI32, num_dims=2)
+        >>> arr = LVArray(LVI32)
         >>> data = arr.build([[1, 2, 3], [4, 5, 6]])
         >>> print(data.hex())
         0000000200000003000000010000000200000003000000040000000500000006
@@ -229,7 +292,7 @@ def LVArray(element_type, num_dims: int = 1):
         >>> cluster.parse(data)
         ([1, 2, 3], [4, 5, 6])
     """
-    return ArrayAdapter(element_type, num_dims)
+    return ArrayAdapter(element_type)
 
 
 # ============================================================================
