@@ -319,6 +319,42 @@ def test_nested_array_in_cluster():
     assert array_bytes[:4].hex() == "00000003"
 
 
+def test_multiple_arrays_in_cluster():
+    """Test Cluster containing multiple arrays (self-delimiting arrays)."""
+    # This tests the key feature: multiple arrays in a cluster can now be
+    # correctly parsed because each array reads only its required bytes from
+    # the stream instead of consuming all remaining bytes
+    cluster_construct = LVCluster(LVArray(LVI32), LVArray(LVI32))
+    data = ([1, 2, 3], [4, 5, 6])
+    
+    serialized = cluster_construct.build(data)
+    deserialized = cluster_construct.parse(serialized)
+    
+    assert deserialized == data
+
+
+def test_multiple_arrays_different_sizes_in_cluster():
+    """Test Cluster with arrays of different sizes."""
+    cluster_construct = LVCluster(LVArray(LVI32), LVArray(LVI32), LVArray(LVI32))
+    data = ([1], [2, 3, 4, 5], [6, 7])
+    
+    serialized = cluster_construct.build(data)
+    deserialized = cluster_construct.parse(serialized)
+    
+    assert deserialized == data
+
+
+def test_array_with_other_types_in_cluster():
+    """Test Cluster with array and other types."""
+    cluster_construct = LVCluster(LVI32, LVArray(LVI32), LVString)
+    data = (42, [1, 2, 3], "Hello")
+    
+    serialized = cluster_construct.build(data)
+    deserialized = cluster_construct.parse(serialized)
+    
+    assert deserialized == data
+
+
 def test_array_of_strings():
     """Test Array1D with string elements."""
     array_construct = LVArray(LVString)
