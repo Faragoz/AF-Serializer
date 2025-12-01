@@ -62,6 +62,9 @@ class ArrayAdapter(Construct):
     For variable-size elements, defaults to 1D parsing.
     """
     
+    # Maximum number of dimensions to try when inferring array shape
+    MAX_DIMENSIONS = 10
+    
     def __init__(self, element_type: Construct):
         """
         Initialize ArrayND construct.
@@ -119,9 +122,8 @@ class ArrayAdapter(Construct):
         # Try to find dimension count that gives exact match
         dims = [first_dim]
         found_exact_match = False
-        max_dims = 10  # Safety limit
         
-        while len(dims) < max_dims:
+        while len(dims) < self.MAX_DIMENSIONS:
             # Calculate what this dimension interpretation would mean
             prod = math.prod(dims)
             dims_bytes = len(dims) * 4
