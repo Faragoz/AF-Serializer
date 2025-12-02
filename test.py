@@ -6,7 +6,10 @@ The key features are:
 2. lvunflatten(data) - Automatically identify and populate the correct class
 """
 
-from af_serializer import lvclass, lvflatten, lvunflatten, LVU16, LVI32, LVString, LVBoolean, LVDouble, LVArray, LVU8
+from af_serializer import (
+    lvclass, lvflatten, lvunflatten,
+    LVU16, LVI32, LVString, LVBoolean, LVDouble, LVArray, LVU8
+)
 
 
 # Define LabVIEW class hierarchy using @lvclass decorator
