@@ -1,8 +1,8 @@
 """
-Decorators for Construct-based LabVIEW Object Support.
+Decorators for LabVIEW Object Support.
 
 This module provides decorators to easily convert Python classes to LabVIEW Objects,
-making it simpler to work with the construct_impl serialization system.
+making it simpler to work with the af_serializer serialization system.
 """
 
 from typing import Optional, Any, List, Type, get_type_hints

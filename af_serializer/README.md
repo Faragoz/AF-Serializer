@@ -16,7 +16,7 @@ This implementation prioritizes:
 ### Module Structure
 
 ```
-src/construct_impl/
+af_serializer/
 ├── __init__.py          # Public API exports
 ├── basic_types.py       # Basic type definitions (Phase 1) ✅
 ├── compound_types.py    # Arrays and Clusters (Phase 2) ✅
@@ -51,7 +51,7 @@ This approach provides:
 ### Basic Example
 
 ```python
-from src.construct_impl import lvflatten, lvunflatten, LVI32, LVString
+from af_serializer import lvflatten, lvunflatten, LVI32, LVString
 
 # Serialize (auto-detect type)
 data = lvflatten(42)
@@ -69,7 +69,7 @@ print(value)  # Output: 42
 ### All Basic Types
 
 ```python
-from src.construct_impl import (
+from af_serializer import (
     lvflatten, lvunflatten,
     LVI32, LVU32, LVI16, LVU16, LVI8, LVU8, LVI64, LVU64,
     LVDouble, LVSingle, LVBoolean, LVString
@@ -110,7 +110,7 @@ lvflatten(True)         # Auto-detects as Boolean
 For common operations, use the convenience functions:
 
 ```python
-from src.construct_impl import (
+from af_serializer import (
     flatten_i32, unflatten_i32,
     flatten_double, unflatten_double,
     flatten_string, unflatten_string,
@@ -141,7 +141,7 @@ value = unflatten_boolean(data)
 Create 1D arrays with homogeneous elements:
 
 ```python
-from src.construct_impl import LVArray1D, LVI32
+from af_serializer import LVArray1D, LVI32
 
 # Create array construct
 array_construct = LVArray1D(LVI32)
@@ -163,7 +163,7 @@ data = string_array.build(["Hello", "World"])
 Create multi-dimensional arrays:
 
 ```python
-from src.construct_impl import LVArray2D, LVI32
+from af_serializer import LVArray2D, LVI32
 
 # Create 2D array construct
 array_construct = LVArray2D(LVI32)
@@ -181,7 +181,7 @@ matrix = array_construct.parse(data)  # [[1, 2, 3], [4, 5, 6]]
 Create heterogeneous collections (NO header, direct concatenation):
 
 ```python
-from src.construct_impl import LVCluster, LVString, LVI32, LVU16
+from af_serializer import LVCluster, LVString, LVI32, LVU16
 
 # String + I32 cluster
 cluster = LVCluster(LVString, LVI32)
@@ -201,7 +201,7 @@ data = cluster.build((42, "Test", 100))
 #### Empty Object
 
 ```python
-from src.construct_impl import LVObject, create_empty_lvobject
+from af_serializer import LVObject, create_empty_lvobject
 
 obj_construct = LVObject()
 obj = create_empty_lvobject()
@@ -213,7 +213,7 @@ print(data.hex())  # 00000000
 #### Single-Level Object
 
 ```python
-from src.construct_impl import LVObject, create_lvobject
+from af_serializer import LVObject, create_lvobject
 
 obj_construct = LVObject()
 obj = create_lvobject(
@@ -231,7 +231,7 @@ deserialized = obj_construct.parse(data)
 Example: Message → Serializable Msg → echo general Msg
 
 ```python
-from src.construct_impl import LVObject, LVCluster, LVString, LVU16, create_lvobject
+from af_serializer import LVObject, LVCluster, LVString, LVU16, create_lvobject
 
 # Create cluster for level 3 data: "Hello World" + U16(0)
 cluster_construct = LVCluster(LVString, LVU16)
@@ -319,7 +319,7 @@ All formats use **big-endian byte order** (network byte order) as required by La
 
 ```python
 # Original implementation
-from src import LVNumeric, LVString, LVSerializer
+from af_serializer import LVNumeric, LVString, LVSerializer
 import numpy as np
 
 serializer = LVSerializer()
@@ -343,7 +343,7 @@ data = serializer.serialize(num)
 
 ```python
 # Construct implementation
-from src.construct_impl import lvflatten, LVI32
+from af_serializer import lvflatten, LVI32
 
 data = lvflatten(42, LVI32)
 ```
@@ -373,7 +373,7 @@ pytest tests/construct_impl/ -v
 pytest tests/construct_impl/test_basic_types.py -v
 
 # Run with coverage
-pytest tests/construct_impl/ --cov=src.construct_impl --cov-report=term-missing
+pytest tests/construct_impl/ --cov=af_serializer --cov-report=term-missing
 ```
 
 ### Test Coverage

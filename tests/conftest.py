@@ -1,9 +1,8 @@
-"""Pytest configuration for construct_impl tests."""
+"""Pytest configuration for af_serializer tests."""
 import sys
 from pathlib import Path
 
-# Add src to the FRONT of path to prioritize it
-src_path = Path(__file__).parent.parent.parent / "src"
-if str(src_path) in sys.path:
-    sys.path.remove(str(src_path))
-sys.path.insert(0, str(src_path))
+# Add project root to path for development installs
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
