@@ -8,7 +8,7 @@ from LabVIEW documentation.
 import pytest
 from construct import ConstructError
 
-from src import (
+from af_serializer import (
     LVI32, LVU16, LVString,
     LVArray, LVCluster,
 )

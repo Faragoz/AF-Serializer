@@ -5,9 +5,8 @@ The key features are:
 1. lvflatten(obj) - Serialize any @lvclass instance to bytes
 2. lvunflatten(data) - Automatically identify and populate the correct class
 """
-from construct import Numpy
 
-from src import lvclass, lvflatten, lvunflatten, LVU16, LVI32, LVString, LVBoolean, LVDouble, LVArray, LVU8
+from af_serializer import lvclass, lvflatten, lvunflatten, LVU16, LVI32, LVString, LVBoolean, LVDouble, LVArray, LVU8
 
 
 # Define LabVIEW class hierarchy using @lvclass decorator

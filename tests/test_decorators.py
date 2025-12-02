@@ -8,7 +8,7 @@ and enables automatic serialization.
 import pytest
 import warnings
 
-from src import (
+from af_serializer import (
     lvfield, is_lvclass, lvflatten, lvunflatten,
     LVObject, LVI32, LVString, LVU16, lvclass,
     get_lvclass_by_name, _LVCLASS_REGISTRY
@@ -245,7 +245,7 @@ def test_lvflatten_integration():
 def test_lvunflatten_class_not_in_registry():
     """Test lvunflatten with class not in registry returns dict with warning."""
     # Create raw LVObject bytes for a class not in registry
-    from src import create_lvobject, LVObject
+    from af_serializer import create_lvobject, LVObject
     
     obj_data = create_lvobject(
         class_name="NonExistent.lvlib:NonExistent.lvclass",

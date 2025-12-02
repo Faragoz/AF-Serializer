@@ -12,8 +12,24 @@ LabVIEW data serialization library for Python. Serialize Python data structures 
 
 ## Installation
 
+Install from PyPI (coming soon):
+
 ```bash
-pip install construct  # Required dependency
+pip install af-serializer
+```
+
+Install from a private GitHub repository:
+
+```bash
+pip install git+https://github.com/Faragoz/AF-Serializer.git
+```
+
+Install for development:
+
+```bash
+git clone https://github.com/Faragoz/AF-Serializer.git
+cd AF-Serializer
+pip install -e .
 ```
 
 ## Quick Start
@@ -23,7 +39,7 @@ pip install construct  # Required dependency
 Use `lvflatten()` to serialize and `lvunflatten()` to automatically deserialize:
 
 ```python
-from src import lvclass, lvflatten, lvunflatten, LVU16
+from af_serializer import lvclass, lvflatten, lvunflatten, LVU16
 
 # Define LabVIEW class hierarchy using @lvclass decorator
 @lvclass(library="Actor Framework", class_name="Message")
@@ -66,7 +82,7 @@ assert restored.code == 42
 Use `lvflatten()` to automatically serialize Python data:
 
 ```python
-from src import lvflatten, lvunflatten, LVI32, LVString
+from af_serializer import lvflatten, lvunflatten, LVI32, LVString
 
 # Simple types - serialize
 lvflatten(42)                    # Integer → I32
@@ -85,7 +101,7 @@ text = lvunflatten(data, LVString)  # Returns "Hello"
 ### Arrays
 
 ```python
-from src import LVArray, LVI32
+from af_serializer import LVArray, LVI32
 
 # 1D Array
 arr = LVArray(LVI32)
@@ -108,7 +124,7 @@ parsed = arr.parse(data)  # Returns original 3D array
 ### Clusters
 
 ```python
-from src import LVCluster, LVString, LVI32
+from af_serializer import LVCluster, LVString, LVI32
 
 cluster = LVCluster(LVString, LVI32)
 data = cluster.build(("Hello, LabVIEW!", 42))
@@ -120,7 +136,7 @@ parsed = cluster.parse(data)  # Returns ("Hello, LabVIEW!", 42)
 The library uses a registry-based system for automatic class detection:
 
 ```
-src/
+af_serializer/
 ├── __init__.py           # Main exports
 ├── api.py                # lvflatten, lvunflatten
 ├── decorators.py         # @lvclass decorator and registry
@@ -134,7 +150,7 @@ src/
 The `@lvclass` decorator registers Python classes in a global registry, enabling automatic identification during deserialization:
 
 ```python
-from src import lvclass, lvflatten, lvunflatten, LVI32
+from af_serializer import lvclass, lvflatten, lvunflatten, LVI32
 
 @lvclass(library="MyLib", class_name="MyClass", version=(1, 0, 0, 1))
 class MyClass:
@@ -212,7 +228,7 @@ pytest tests/test_objects.py -v
 ## Example: Complete Roundtrip
 
 ```python
-from src import lvclass, lvflatten, lvunflatten, LVU16, LVI32
+from af_serializer import lvclass, lvflatten, lvunflatten, LVU16, LVI32
 
 # Define a 3-level class hierarchy
 @lvclass(library="Level1", class_name="Base")
@@ -290,7 +306,7 @@ text = lvunflatten(data, LVString)
 Lookup a class in the registry by its LabVIEW name.
 
 ```python
-from src import get_lvclass_by_name
+from af_serializer import get_lvclass_by_name
 
 cls = get_lvclass_by_name("MyLib.lvlib:MyClass.lvclass")
 ```

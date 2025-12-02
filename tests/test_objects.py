@@ -8,7 +8,7 @@ real HEX examples from LabVIEW documentation.
 import pytest
 import warnings
 
-from src import (
+from af_serializer import (
     LVObject, LVI32, LVU16, LVString, LVCluster,
     create_empty_lvobject, create_lvobject,
 )

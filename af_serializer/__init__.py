@@ -30,7 +30,7 @@ Object Types:
     - @lvclass decorator: Mark Python classes as LabVIEW Objects
 
 Usage:
-    >>> from src import lvclass, lvflatten, lvunflatten
+    >>> from af_serializer import lvclass, lvflatten, lvunflatten
     >>> 
     >>> @lvclass(library="MyLib", class_name="MyClass")
     >>> class MyClass:
