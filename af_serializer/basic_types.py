@@ -45,6 +45,9 @@ LVStringType: TypeAlias = Annotated[str, "LabVIEW String (Pascal String, MBCS)"]
 # ============================================================================
 # Integer Types (Big-Endian)
 # ============================================================================
+"""
+{"enum":["Invalid Type","Void","I8","I16","I32","I64","U8","U16","U32","U64","Single Float","Double Float","Extended Float","Single Complex","Double Complex","Extended Complex","Enum U8","Enum U16","Enum U32","Enum U64","Single Float With Unit","Double Float With Unit","Extended Float With Unit","Single Complex with Unit","Double Complex with Unit","Extended Complex with Unit","Boolean","String","Path","Picture","Tag","Array","Cluster","Variant","LV Variant","Waveform","Timestamp","Digital Waveform","Digital Data","ExpressData","Refnum","External Data","VI","Poly VI","LabVIEW Class Instance","Fixed Point","Set Collection","Map Collection"]}
+"""
 
 LVI32 = Int32sb
 """LabVIEW I32: Signed 32-bit integer, big-endian."""

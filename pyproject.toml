@@ -46,9 +46,8 @@ Homepage = "https://github.com/Faragoz/AF-Serializer"
 Repository = "https://github.com/Faragoz/AF-Serializer"
 Issues = "https://github.com/Faragoz/AF-Serializer/issues"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["af_serializer*"]
+[tool.setuptools]
+packages = ["af_serializer"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

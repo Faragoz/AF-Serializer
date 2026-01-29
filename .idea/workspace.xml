@@ -5,8 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4d163ab3-28ef-43da-8f7d-d42c40a454e5" name="Changes" comment="Init">
+      <change beforePath="$PROJECT_DIR$/.idea/AF-Serializer.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/AF-Serializer.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test.py" beforeDir="false" afterPath="$PROJECT_DIR$/test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/af_serializer/basic_types.py" beforeDir="false" afterPath="$PROJECT_DIR$/af_serializer/basic_types.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -48,33 +51,34 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python tests.Doctests in Serializer.executor": "Run",
-    "Python tests.Doctests in compound_types.executor": "Run",
-    "Python tests.Python tests in test_basic_types.py.executor": "Run",
-    "Python tests.Python tests in test_compound_types.py.executor": "Run",
-    "Python tests.Python tests in test_decorators.py.executor": "Run",
-    "Python tests.Python tests in test_objects.py.executor": "Run",
-    "Python.Serializer.executor": "Run",
-    "Python.examples_construct_impl.executor": "Run",
-    "Python.examples_decorators.executor": "Run",
-    "Python.hehe.executor": "Run",
-    "Python.test.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "main",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "http.proxy",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python tests.Doctests in Serializer.executor&quot;: &quot;Run&quot;,
+    &quot;Python tests.Doctests in compound_types.executor&quot;: &quot;Run&quot;,
+    &quot;Python tests.Doctests in objects.executor&quot;: &quot;Run&quot;,
+    &quot;Python tests.Python tests in test_basic_types.py.executor&quot;: &quot;Run&quot;,
+    &quot;Python tests.Python tests in test_compound_types.py.executor&quot;: &quot;Run&quot;,
+    &quot;Python tests.Python tests in test_decorators.py.executor&quot;: &quot;Run&quot;,
+    &quot;Python tests.Python tests in test_objects.py.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Serializer.executor&quot;: &quot;Run&quot;,
+    &quot;Python.examples_construct_impl.executor&quot;: &quot;Run&quot;,
+    &quot;Python.examples_decorators.executor&quot;: &quot;Run&quot;,
+    &quot;Python.hehe.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\hugofroylan.aragon\Documents\Neuro\Code\AF-Serializer" />
@@ -99,7 +103,17 @@
       <workItem from="1763739568490" duration="11000" />
       <workItem from="1764168954881" duration="6814000" />
       <workItem from="1764231935152" duration="7656000" />
-      <workItem from="1764602298786" duration="403000" />
+      <workItem from="1764602298786" duration="2564000" />
+      <workItem from="1764678278013" duration="1815000" />
+      <workItem from="1764775165611" duration="636000" />
+      <workItem from="1764955823343" duration="930000" />
+      <workItem from="1765546074361" duration="3188000" />
+      <workItem from="1769695687942" duration="144000" />
+      <workItem from="1769698331952" duration="247000" />
+      <workItem from="1769699380584" duration="2291000" />
+      <workItem from="1769701792565" duration="47000" />
+      <workItem from="1769703120763" duration="21000" />
+      <workItem from="1769704032130" duration="14000" />
     </task>
     <task id="LOCAL-00001" summary="Init">
       <option name="closed" value="true" />
@@ -145,13 +159,13 @@
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/AF_Serializer$Doctests_in_Serializer.coverage" NAME="Doctests in Serializer Coverage Results" MODIFIED="1763131273007" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
     <SUITE FILE_PATH="coverage/AF_Serializer$Doctests_in_api.coverage" NAME="Doctests in api Coverage Results" MODIFIED="1764328292066" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
-    <SUITE FILE_PATH="coverage/AF_Serializer$.coverage" NAME=" Coverage Results" MODIFIED="1764597992994" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/AF_Serializer$Doctests_in_objects.coverage" NAME="Doctests in objects Coverage Results" MODIFIED="1764323819178" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
+    <SUITE FILE_PATH="coverage/AF_Serializer$.coverage" NAME=" Coverage Results" MODIFIED="1764690210251" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/AF_Serializer$Doctests_in_objects.coverage" NAME="Doctests in objects Coverage Results" MODIFIED="1769700577952" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/af_serializer" />
     <SUITE FILE_PATH="coverage/AF_Serializer$hehe.coverage" NAME="hehe Coverage Results" MODIFIED="1763133020055" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/AF_Serializer$examples_decorators.coverage" NAME="examples_decorators Coverage Results" MODIFIED="1764602527527" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/AF_Serializer$Doctests_in_compound_types.coverage" NAME="Doctests in compound_types Coverage Results" MODIFIED="1764176302250" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
     <SUITE FILE_PATH="coverage/AF_Serializer$examples_construct_impl.coverage" NAME="examples_construct_impl Coverage Results" MODIFIED="1764602534571" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/AF_Serializer$test.coverage" NAME="test Coverage Results" MODIFIED="1764602685371" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/AF_Serializer$test.coverage" NAME="test Coverage Results" MODIFIED="1769701670469" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/AF_Serializer$Serializer.coverage" NAME="Serializer Coverage Results" MODIFIED="1763131308748" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
   </component>
 </project>
