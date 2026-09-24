@@ -96,20 +96,20 @@ class FixedPointAdapter(Adapter):
         setup, so Int64ub is used as the default for maximum resolution. Change
         the subcon if your LabVIEW configuration differs (e.g. Int64sb).
 
-        - word_length: total number of bits (default 64).
-        - integer_word_length: bits reserved for the integer part (default 9).
+        - wl (word_length): total number of bits (default 64).
+        - iwl (integer_word_length): bits reserved for the integer part (default 9).
 
-        With word_length=64 and integer_word_length=9 the number is unsigned
+        With wl=64 and iwl=9 the number is unsigned
         with f=53 fractional bits:
             - max value: 2^9 - 1 = 512
             - resolution: 2^-53 ≈ 2,77556E-17
     """
-    def __init__(self, integer_word_length=9, word_length=64, subcon=Int64ub):
+    def __init__(self, iwl=9, wl=64, subcon=Int64ub):
         super().__init__(subcon)
-        self.word_length = word_length
-        self.integer_word_length = integer_word_length
+        self.word_length = wl
+        self.integer_word_length = iwl
         # Fractional bits and scale factor (2^f)
-        self.fractional_bits = word_length - integer_word_length
+        self.fractional_bits = wl - iwl
         self.scale_factor = 1 << self.fractional_bits
 
     def _decode(self, obj, context, path):
