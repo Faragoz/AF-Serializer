@@ -2,6 +2,8 @@
 LabVIEW Object Types using Construct Library.
 
 This module implements LabVIEW Object (LVObject) serialization.
+https://www.ni.com/docs/en-US/bundle/labview/page/flattened-data.html
+https://labviewwiki.org/wiki/LabVIEW_Object
 
 LabVIEW Objects contain:
     - NumLevels: Number of inheritance levels

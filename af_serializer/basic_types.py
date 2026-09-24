@@ -84,6 +84,44 @@ LVDouble = Float64b
 LVSingle = Float32b
 """LabVIEW Single: 32-bit floating point, big-endian IEEE 754."""
 
+# ============================================================================
+# Fixed Point Types (8-byte chunks, Big-Endian)
+# ============================================================================
+
+class FixedPointAdapter(Adapter):
+    """
+        Adapter to serialize/deserialize a LabVIEW Fixed Point number.
+
+        LabVIEW was observed to emit Fixed Point values as 8-byte chunks in this
+        setup, so Int64ub is used as the default for maximum resolution. Change
+        the subcon if your LabVIEW configuration differs (e.g. Int64sb).
+
+        - word_length: total number of bits (default 64).
+        - integer_word_length: bits reserved for the integer part (default 9).
+
+        With word_length=64 and integer_word_length=9 the number is unsigned
+        with f=53 fractional bits:
+            - max value: 2^9 - 1 = 512
+            - resolution: 2^-53 ≈ 2,77556E-17
+    """
+    def __init__(self, integer_word_length=9, word_length=64, subcon=Int64ub):
+        super().__init__(subcon)
+        self.word_length = word_length
+        self.integer_word_length = integer_word_length
+        # Fractional bits and scale factor (2^f)
+        self.fractional_bits = word_length - integer_word_length
+        self.scale_factor = 1 << self.fractional_bits
+
+    def _decode(self, obj, context, path):
+        # Stream integer -> float, undoing the fixed-point scaling
+        return obj / self.scale_factor
+
+    def _encode(self, obj, context, path):
+        # Float -> rounded, scaled integer to write to the stream
+        return int(round(obj * self.scale_factor))
+
+LVFixedPoint = FixedPointAdapter
+LVFP = FixedPointAdapter
 
 # ============================================================================
 # Boolean Type
