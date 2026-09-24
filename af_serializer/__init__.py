@@ -71,6 +71,7 @@ from .basic_types import (
     # Type aliases
     LVI32Type, LVU32Type, LVI16Type, LVU16Type, LVI8Type, LVU8Type,
     LVI64Type, LVU64Type,
+    LVFixedPoint, LVFP,
     LVDoubleType, LVSingleType,
     LVBooleanType,
     LVStringType,
@@ -128,6 +129,7 @@ __all__ = [
     "LVI32Type", "LVU32Type", "LVI16Type", "LVU16Type", "LVI8Type", "LVU8Type",
     "LVI64Type", "LVU64Type",
     "LVDoubleType", "LVSingleType",
+    "LVFixedPoint", "LVFP",
     "LVBooleanType",
     "LVStringType",
     # Compound types
