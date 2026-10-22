@@ -1,0 +1,366 @@
+"""
+Unit tests for LabVIEW compound types (Arrays and Clusters).
+
+These tests validate serialization and deserialization against real HEX examples
+from LabVIEW documentation.
+"""
+
+import pytest
+from construct import ConstructError
+
+from af_serializer import (
+    LVI32, LVU16, LVString,
+    LVArray, LVCluster,
+)
+
+
+# ============================================================================
+# Array 1D Tests
+# ============================================================================
+
+def test_array1d_serialization_three_elements():
+    """Validate Array1D serialization against real LabVIEW hex output."""
+    # Array of 3 I32 elements: [1, 2, 3]
+    # Expected: 0000 0003 0000 0001 0000 0002 0000 0003
+    array_construct = LVArray(LVI32)
+    data = [1, 2, 3]
+    expected_hex = "00000003000000010000000200000003"
+    
+    result = array_construct.build(data)
+    
+    assert result.hex() == expected_hex
+
+
+def test_array1d_deserialization_roundtrip():
+    """Test Array1D serialize → deserialize → compare."""
+    array_construct = LVArray(LVI32)
+    original = [1, 2, 3]
+    
+    serialized = array_construct.build(original)
+    deserialized = array_construct.parse(serialized)
+    
+    assert deserialized == original
+
+
+def test_array1d_empty_array():
+    """Test Array1D with empty array."""
+    array_construct = LVArray(LVI32)
+    data = []
+    expected_hex = "00000000"
+    
+    result = array_construct.build(data)
+    
+    assert result.hex() == expected_hex
+
+
+def test_array1d_single_element():
+    """Test Array1D with single element."""
+    array_construct = LVArray(LVI32)
+    data = [42]
+    expected_hex = "000000010000002a"
+    
+    result = array_construct.build(data)
+    
+    assert result.hex() == expected_hex
+
+
+@pytest.mark.parametrize("data", [
+    [1],
+    [1, 2],
+    [1, 2, 3, 4, 5],
+    [0, 0, 0],
+    [-1, -2, -3],
+])
+def test_array1d_roundtrip_parametrized(data):
+    """Test Array1D roundtrip with various data."""
+    array_construct = LVArray(LVI32)
+    
+    serialized = array_construct.build(data)
+    deserialized = array_construct.parse(serialized)
+    
+    assert deserialized == data
+
+
+# ============================================================================
+# Array 2D Tests
+# ============================================================================
+
+def test_array2d_serialization_2x3_matrix():
+    """Validate Array2D serialization for 2×3 matrix."""
+    # 2×3 matrix: [[1, 2, 3], [4, 5, 6]]
+    # Format: [dim0=2 (I32)] [dim1=3 (I32)] [6 elements]
+    array_construct = LVArray(LVI32)
+    data = [[1, 2, 3], [4, 5, 6]]
+    
+    result = array_construct.build(data)
+    
+    # Check header (dimensions only, no num_dims)
+    assert result[:4].hex() == "00000002"  # dim0 = 2
+    assert result[4:8].hex() == "00000003"  # dim1 = 3
+    
+    # Check elements
+    assert result[8:12].hex() == "00000001"  # element 0
+    assert result[12:16].hex() == "00000002"  # element 1
+    assert result[16:20].hex() == "00000003"  # element 2
+    assert result[20:24].hex() == "00000004"  # element 3
+    assert result[24:28].hex() == "00000005"  # element 4
+    assert result[28:32].hex() == "00000006"  # element 5
+
+
+def test_array2d_deserialization_roundtrip():
+    """Test Array2D serialize → deserialize → compare."""
+    array_construct = LVArray(LVI32)
+    original = [[1, 2, 3], [4, 5, 6]]
+    
+    serialized = array_construct.build(original)
+    deserialized = array_construct.parse(serialized)
+    
+    assert deserialized == original
+
+
+def test_array2d_single_row():
+    """Test Array2D with single row."""
+    array_construct = LVArray(LVI32)
+    data = [[1, 2, 3]]
+    
+    serialized = array_construct.build(data)
+    deserialized = array_construct.parse(serialized)
+    
+    assert deserialized == data
+
+
+@pytest.mark.parametrize("data", [
+    [[1, 2], [3, 4]],
+    [[1, 2, 3]],
+    [[1], [2], [3]],
+])
+def test_array2d_roundtrip_parametrized(data):
+    """Test Array2D roundtrip with various data."""
+    array_construct = LVArray(LVI32)
+    
+    serialized = array_construct.build(data)
+    deserialized = array_construct.parse(serialized)
+    
+    assert deserialized == data
+
+
+# ============================================================================
+# Array 3D Tests
+# ============================================================================
+
+def test_array3d_serialization_2x2x2():
+    """Validate Array3D serialization for 2×2×2 cube."""
+    # 2×2×2 cube
+    # Format: [dim0=2 (I32)] [dim1=2 (I32)] [dim2=2 (I32)] [8 elements]
+    array_construct = LVArray(LVI32)
+    data = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
+    
+    result = array_construct.build(data)
+    
+    # Check header (dimensions only, no num_dims)
+    assert result[:4].hex() == "00000002"  # dim0 = 2
+    assert result[4:8].hex() == "00000002"  # dim1 = 2
+    assert result[8:12].hex() == "00000002"  # dim2 = 2
+    
+    # Check elements (row-major order)
+    assert result[12:16].hex() == "00000001"  # element 0
+    assert result[16:20].hex() == "00000002"  # element 1
+    assert result[20:24].hex() == "00000003"  # element 2
+    assert result[24:28].hex() == "00000004"  # element 3
+    assert result[28:32].hex() == "00000005"  # element 4
+    assert result[32:36].hex() == "00000006"  # element 5
+    assert result[36:40].hex() == "00000007"  # element 6
+    assert result[40:44].hex() == "00000008"  # element 7
+
+
+def test_array3d_deserialization_roundtrip():
+    """Test Array3D serialize → deserialize → compare."""
+    array_construct = LVArray(LVI32)
+    original = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
+    
+    serialized = array_construct.build(original)
+    deserialized = array_construct.parse(serialized)
+    
+    assert deserialized == original
+
+
+def test_array3d_2x4x4_roundtrip():
+    """Test Array3D with 2×4×4 shape (from user example)."""
+    array_construct = LVArray(LVI32)
+    # Create 2×4×4 array with specific values
+    data = [
+        [[7, 0, 0, 0], [8, 0, 0, 0], [0, 0, 3, 0], [0, 0, 0, 5]],
+        [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 6], [0, 0, 0, 0]]
+    ]
+    
+    serialized = array_construct.build(data)
+    
+    # Check header (dimensions only, no num_dims)
+    assert serialized[:4].hex() == "00000002"  # dim0 = 2
+    assert serialized[4:8].hex() == "00000004"  # dim1 = 4
+    assert serialized[8:12].hex() == "00000004"  # dim2 = 4
+    
+    # Roundtrip
+    deserialized = array_construct.parse(serialized)
+    assert deserialized == data
+
+
+@pytest.mark.parametrize("data", [
+    [[[1, 2], [3, 4]], [[5, 6], [7, 8]]],  # 2×2×2
+    [[[1, 2, 3], [4, 5, 6]]],  # 1×2×3
+    [[[1], [2]], [[3], [4]], [[5], [6]]],  # 3×2×1
+])
+def test_array3d_roundtrip_parametrized(data):
+    """Test Array3D roundtrip with various shapes."""
+    array_construct = LVArray(LVI32)
+    
+    serialized = array_construct.build(data)
+    deserialized = array_construct.parse(serialized)
+    
+    assert deserialized == data
+
+
+# ============================================================================
+# Cluster Tests
+# ============================================================================
+
+def test_cluster_serialization_string_and_i32():
+    """Validate Cluster serialization against real LabVIEW hex output."""
+    # Cluster: (String "Hello, LabVIEW!" + I32(0))
+    # Expected: 0000 000f 48656c6c6f2c204c61625649455721 00000000
+    cluster_construct = LVCluster(LVString, LVI32)
+    data = ("Hello, LabVIEW!", 0)
+    
+    result = cluster_construct.build(data)
+    
+    # Check string part
+    assert result[:4].hex() == "0000000f"  # String length = 15
+    assert result[4:19].decode('utf-8') == "Hello, LabVIEW!"
+    
+    # Check I32 part
+    assert result[19:23].hex() == "00000000"  # I32(0)
+
+
+def test_cluster_deserialization_roundtrip():
+    """Test Cluster serialize → deserialize → compare."""
+    cluster_construct = LVCluster(LVString, LVI32)
+    original = ("Hello, LabVIEW!", 0)
+    
+    serialized = cluster_construct.build(original)
+    deserialized = cluster_construct.parse(serialized)
+    
+    assert deserialized == original
+
+
+def test_cluster_multiple_types():
+    """Test Cluster with multiple different types."""
+    cluster_construct = LVCluster(LVI32, LVString, LVI32)
+    data = (42, "Test", 100)
+    
+    serialized = cluster_construct.build(data)
+    deserialized = cluster_construct.parse(serialized)
+    
+    assert deserialized == data
+
+
+def test_cluster_string_and_u16():
+    """Test Cluster with string and U16 (from user example)."""
+    # "Hello World" + U16(0)
+    cluster_construct = LVCluster(LVString, LVU16)
+    data = ("Hello World", 0)
+    
+    serialized = cluster_construct.build(data)
+    deserialized = cluster_construct.parse(serialized)
+    
+    assert deserialized == data
+    
+    # Check hex format
+    assert serialized[:4].hex() == "0000000b"  # String length = 11
+    assert serialized[4:15].decode('utf-8') == "Hello World"
+    assert serialized[15:17].hex() == "0000"  # U16(0)
+
+
+@pytest.mark.parametrize("data", [
+    (42, "Test"),
+    ("Hello", 123, "World"),
+    (1, 2, 3, 4),
+])
+def test_cluster_various_combinations(data):
+    """Test Cluster with various type combinations."""
+    # Build constructs based on data types
+    constructs = []
+    for item in data:
+        if isinstance(item, str):
+            constructs.append(LVString)
+        elif isinstance(item, int):
+            constructs.append(LVI32)
+    
+    cluster_construct = LVCluster(*constructs)
+    
+    serialized = cluster_construct.build(data)
+    deserialized = cluster_construct.parse(serialized)
+    
+    assert deserialized == data
+
+
+# ============================================================================
+# Integration Tests
+# ============================================================================
+
+def test_nested_array_in_cluster():
+    """Test Cluster containing an array."""
+    # This is more complex - cluster with array as one element
+    # For now, we test that arrays and clusters work independently
+    array_construct = LVArray(LVI32)
+    array_data = [1, 2, 3]
+    array_bytes = array_construct.build(array_data)
+    
+    # Verify array serialization works
+    assert array_bytes[:4].hex() == "00000003"
+
+
+def test_multiple_arrays_in_cluster():
+    """Test Cluster containing multiple arrays (self-delimiting arrays)."""
+    # This tests the key feature: multiple arrays in a cluster can now be
+    # correctly parsed because each array reads only its required bytes from
+    # the stream instead of consuming all remaining bytes
+    cluster_construct = LVCluster(LVArray(LVI32), LVArray(LVI32))
+    data = ([1, 2, 3], [4, 5, 6])
+    
+    serialized = cluster_construct.build(data)
+    deserialized = cluster_construct.parse(serialized)
+    
+    assert deserialized == data
+
+
+def test_multiple_arrays_different_sizes_in_cluster():
+    """Test Cluster with arrays of different sizes."""
+    cluster_construct = LVCluster(LVArray(LVI32), LVArray(LVI32), LVArray(LVI32))
+    data = ([1], [2, 3, 4, 5], [6, 7])
+    
+    serialized = cluster_construct.build(data)
+    deserialized = cluster_construct.parse(serialized)
+    
+    assert deserialized == data
+
+
+def test_array_with_other_types_in_cluster():
+    """Test Cluster with array and other types."""
+    cluster_construct = LVCluster(LVI32, LVArray(LVI32), LVString)
+    data = (42, [1, 2, 3], "Hello")
+    
+    serialized = cluster_construct.build(data)
+    deserialized = cluster_construct.parse(serialized)
+    
+    assert deserialized == data
+
+
+def test_array_of_strings():
+    """Test Array1D with string elements."""
+    array_construct = LVArray(LVString)
+    data = ["Hello", "World", "Test"]
+    
+    serialized = array_construct.build(data)
+    deserialized = array_construct.parse(serialized)
+    
+    assert deserialized == data

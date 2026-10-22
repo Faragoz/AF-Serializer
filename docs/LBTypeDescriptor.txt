@@ -1,0 +1,259 @@
+'''Type descriptors''' are used to define [[Data type|data types]] in [[LabVIEW]]. Simplest types consist of only ''TypeDesc ID'', but more advanced ones have additional properties describing them. Compound types also contain references to the sub-types they include.
+
+From the LabVIEW Help:
+
+LabVIEW associates each wire and terminal on the block diagram with a data type. LabVIEW keeps track of this type with a structure in memory called a ''type descriptor''. This type descriptor is a sequence of 32-bit integers that can describe any data type in LabVIEW. Numeric values are written in hexadecimal format, unless otherwise noted.
+
+'''Note:''' The help text above explain how ''Type descriptors'' are stored in memory when a [[VI|VI file]] is loaded. Their [[Flattening|flattened]] form conserves space and mostly uses values smaller than 32-bit.
+
+== List of TD types ==
+
+{| class="wikitable"
+! TypeDesc ID
+! Description
+! Data Type
+|-
+|0x00
+|Void type, stores no data
+| [[Void data type]]
+|-
+|0x01
+|Integer with signed 1 byte (8 bit) data
+| [[I8 data type]]
+|-
+|0x02
+|Integer with signed 2 byte (16 bit) data
+| [[I16 data type]]
+|-
+|0x03
+|Integer with signed 4 byte (32 bit) data
+| [[I32 data type]]
+|-
+|0x04
+|Integer with signed 8 byte (64 bit) data
+| [[I64 data type]]
+|-
+|0x05
+|Integer with unsigned 1 byte (8 bit) data
+| [[U8 data type]]
+|-
+|0x06
+|Integer with unsigned 2 byte (16 bit) data
+| [[U16 data type]]
+|-
+|0x07
+|Integer with unsigned 4 byte (32 bit) data
+| [[U32 data type]]
+|-
+|0x08
+|Integer with unsigned 8 byte (64 bit) data
+| [[U64 data type]]
+|-
+|0x09
+|Floating point with single precision 4 byte data
+| [[SGL data type]]
+|-
+|0x0A
+|Floating point with double precision 8 byte data
+| [[DBL data type]]
+|-
+|0x0B
+|Floating point with extended (quad precision) data
+| [[EXT data type]]
+|-
+|0x0C
+|Complex floating point with 8 byte data
+| [[CSG data type]]
+|-
+|0x0D
+|Complex floating point with 16 byte data
+| [[CDB data type]]
+|-
+|0x0E
+|Complex floating point with extended (quad precision) data
+| [[CXT data type]]
+|-
+|0x15
+|Enumerated UInt8
+| [[Enum U8 data type]]
+|-
+|0x16
+|Enumerated UInt16
+| [[Enum U16 data type]]
+|-
+|0x17
+|Enumerated UInt32
+| [[Enum U32 data type]]
+|-
+|0x19
+|Unit Float32
+| 
+|-
+|0x1A
+|Unit Float64
+| 
+|-
+|0x1B
+|Unit FloatExt
+|
+|-
+|0x1C
+|Unit Complex64
+|
+|-
+|0x1D
+|Unit Complex128
+|
+|-
+|0x1E
+|Unit ComplexExt
+|
+|-
+|0x20
+|Boolean value stored on 2 bytes (16 bit), rarely used
+|
+|-
+|0x21
+|Boolean value stored on 1 byte (8 bit)
+| [[Boolean data type]]
+|-
+|0x30
+|String value
+| [[String data type]]
+|-
+|0x31
+|Variation of String value, probably never used
+|
+|-
+|0x32
+|Path value, used for disk paths, sometimes for URLs
+| [[Path data type]]
+|-
+|0x33
+|Picture data
+| [[Picture data type]]
+|-
+|0x34
+|CString
+|
+|-
+|0x35
+|PasString
+|
+|-
+|0x37
+|Tag
+|
+|-
+|0x3F
+|SubString
+|
+|-
+|0x40
+|Array
+|
+|-
+|0x41
+|Array Data Ptr
+|
+|-
+|0x4F
+|SubArray
+|
+|-
+|0x50
+|Cluster, storing several sub-TDs in a sequence
+| [[Cluster data type]]
+|-
+|0x53
+|Variant data type
+| [[Variant data type]]
+|-
+|0x54
+|Measurement (Waveform) data; has [[Waveform descriptor|multiple sub-types]]
+| [[Waveform data type]]
+|-
+|0x5E
+|Complex fixed point number
+|
+|-
+|0x5F
+|Fixed point number
+| [[Fixed-point data type]]
+|-
+|0x60
+|Block
+|
+|-
+|0x61
+|Type block
+|
+|-
+|0x62
+|Void block
+|
+|-
+|0x63
+|Aligned block
+|
+|-
+|0x64
+|Repeated block, stores amount of repeats and one sub-TD to be repeated
+|
+|-
+|0x65
+|Alignment marker
+|
+|-
+|0x70
+|Refnum; has [[Refnum descriptor|multiple sub-types]], each with different set of properties
+| [[Reference data type]]
+|-
+|0x73
+|Set Collection
+| [[Set data type]]
+|-
+|0x74
+|Map Collection
+| [[Map data type]]
+|-
+|0x80
+|Ptr
+|
+|-
+|0x83
+|Ptr to
+|
+|-
+|0x84
+|Ext Data
+|
+|-
+|0xA0
+|Array interface
+|
+|-
+|0xA1
+|Interface to data
+|
+|-
+|0xF0
+|Function
+|
+|-
+|0xF1
+|TypeDef
+|
+|-
+|0xF2
+|PolyVI
+|
+|}
+
+==External links==
+
+*[http://zone.ni.com/reference/en-XX/help/371361B-01/lvconcepts/type_descriptors/ LabVIEW 8.2 Help>>Type Descriptors]
+*[http://zone.ni.com/reference/en-XX/help/371361B-01/lvconcepts/how_labview_stores_data_in_memory/ LabVIEW 8.2 Help>>How LabVIEW Stores Data in Memory]
+
+[[Category:LabVIEW internals]]
+[[Category:Data types]]
